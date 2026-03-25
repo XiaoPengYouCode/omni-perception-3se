@@ -1,15 +1,16 @@
-#include "app_config.hpp"
+#include "core/app_config.hpp"
 
 #include <cmath>
 #include <stdexcept>
 
-namespace cmake_demo {
+namespace op3 {
 
 std::vector<int> parse_camera_ids(const std::vector<std::string>& args,
                                   int default_camera_count) {
   std::vector<int> camera_ids;
   camera_ids.reserve(args.size());
 
+  // Parse every provided token strictly as a single integer camera id.
   for (const std::string& arg : args) {
     std::size_t parsed_length = 0;
     const int camera_id = std::stoi(arg, &parsed_length);
@@ -23,6 +24,7 @@ std::vector<int> parse_camera_ids(const std::vector<std::string>& args,
     return camera_ids;
   }
 
+  // Fall back to a simple contiguous range when the caller does not specify ids.
   for (int i = 0; i < default_camera_count; ++i) {
     camera_ids.push_back(i);
   }
@@ -35,9 +37,10 @@ GridShape compute_grid_shape(int tile_count) {
     return {.rows = 0, .columns = 0};
   }
 
+  // Keep the layout intentionally simple: one tile stays 1x1, otherwise prefer two columns.
   const int columns = tile_count == 1 ? 1 : 2;
   const int rows = static_cast<int>(std::ceil(tile_count / static_cast<double>(columns)));
   return {.rows = rows, .columns = columns};
 }
 
-}  // namespace cmake_demo
+}  // namespace op3

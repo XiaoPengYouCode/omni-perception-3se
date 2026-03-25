@@ -4,13 +4,13 @@ set shell := ["sh", "-cu"]
 default:
   @just --list
 
-# Build a target. Defaults to `cmake_demo`. Pass a target name and/or `-r` or `--release`.
+# Build a target. Defaults to `omni-perception-3se`. Pass a target name and/or `-r` or `--release`.
 build *args:
-  mode=Debug; dir=build; target=cmake_demo; \
+  mode=Debug; dir=build; target=omni-perception-3se; \
   for arg in {{args}}; do \
     if [ "$arg" = "--release" ] || [ "$arg" = "-r" ]; then \
       mode=Release; dir=build-release; \
-    elif [ "$target" = "cmake_demo" ]; then \
+    elif [ "$target" = "omni-perception-3se" ]; then \
       target="$arg"; \
     fi; \
   done; \
@@ -21,13 +21,13 @@ build *args:
     -DVCPKG_MANIFEST_MODE=ON; \
   cmake --build "$dir" --target "$target"
 
-# Build and run a target. Defaults to `cmake_demo`. Pass a target name and/or `-r` or `--release`.
+# Build and run a target. Defaults to `omni-perception-3se`. Pass a target name and/or `-r` or `--release`.
 run *args:
-  mode=Debug; dir=build; target=cmake_demo; \
+  mode=Debug; dir=build; target=omni-perception-3se; \
   for arg in {{args}}; do \
     if [ "$arg" = "--release" ] || [ "$arg" = "-r" ]; then \
       mode=Release; dir=build-release; \
-    elif [ "$target" = "cmake_demo" ]; then \
+    elif [ "$target" = "omni-perception-3se" ]; then \
       target="$arg"; \
     fi; \
   done; \

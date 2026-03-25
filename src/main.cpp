@@ -1,56 +1,112 @@
-#include <string>
+#include "core/blocking_queue.hpp"
+#include "perception/camera_worker.hpp"
+#include "perception/demo_frames.hpp"
+#include "perception/fusion_tracker.hpp"
+#include "perception/json_output.hpp"
+#include "perception/mock_person_detector.hpp"
+#include "perception/state_publisher.hpp"
+#include "perception/types.hpp"
 
-#include "logger.hpp"
-#include <opencv2/opencv.hpp>
+#include <chrono>
+#include <cstdlib>
+#include <thread>
 
-namespace {
-
-constexpr int kImageWidth = 960;
-constexpr int kImageHeight = 540;
-constexpr int kSquareSize = 60;
-
-cv::Mat make_demo_image() {
-  cv::Mat image(kImageHeight, kImageWidth, CV_8UC3, cv::Scalar(235, 235, 235));
-
-  for (int y = 0; y < kImageHeight; y += kSquareSize) {
-    for (int x = 0; x < kImageWidth; x += kSquareSize) {
-      const bool is_dark_square = ((x / kSquareSize) + (y / kSquareSize)) % 2 == 0;
-      const cv::Scalar color = is_dark_square ? cv::Scalar(40, 40, 40)
-                                              : cv::Scalar(245, 245, 245);
-      cv::rectangle(image, cv::Rect(x, y, kSquareSize, kSquareSize), color, cv::FILLED);
-    }
-  }
-
-  return image;
-}
-
-}  // namespace
+#include <fmt/format.h>
+#include <opencv2/core/utils/logger.hpp>
 
 int main() {
-  cmake_demo::log_info("Creating demo image: {}x{}", kImageWidth, kImageHeight);
-  cv::Mat image = make_demo_image();
+  // Keep OpenCV quiet so stdout stays machine-readable JSON.
+  setenv("OPENCV_LOG_LEVEL", "ERROR", 1);
+  cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
 
-  if (image.empty()) {
-    cmake_demo::log_error("Failed to create demo image");
-    return 1;
-  }
+  // Build a fully synthetic four-camera scene so the pipeline can run without hardware.
+  const std::vector<op3::FrameInput> frames = op3::make_demo_frames();
+  op3::BlockingQueue<op3::FrameMessage> left_front_queue(1);
+  op3::BlockingQueue<op3::FrameMessage> right_front_queue(1);
+  op3::BlockingQueue<op3::FrameMessage> left_rear_queue(1);
+  op3::BlockingQueue<op3::FrameMessage> right_rear_queue(1);
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(32);
 
-  const std::string window_name = "cmake-demo";
-  cmake_demo::log_info("Opening window '{}'", window_name);
-  cmake_demo::log_info("Press q or Esc to quit");
+  // The tracker fuses asynchronous detections while the publisher exposes state snapshots.
+  op3::FusionTracker tracker(detection_queue);
+  tracker.start();
 
-  cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
-  cv::imshow(window_name, image);
+  op3::StatePublisher publisher(
+      tracker, std::chrono::milliseconds(20),
+      [](const op3::PipelineOutput& output) {
+        if (output.sequence_id == 0) {
+          return;
+        }
+        fmt::print("{}\n", op3::to_json(output));
+      });
+  publisher.start();
 
-  while (true) {
-    const int key = cv::waitKey(16);
-    if (key == 27 || key == 'q' || key == 'Q') {
-      cmake_demo::log_info("Exit requested by user");
-      break;
+  // Each camera owns its own detector instance and worker thread.
+  op3::CameraWorker left_front_worker(
+      op3::CameraPosition::kLeftFront, std::make_unique<op3::MockPersonDetector>(),
+      left_front_queue, detection_queue);
+  op3::CameraWorker right_front_worker(
+      op3::CameraPosition::kRightFront, std::make_unique<op3::MockPersonDetector>(),
+      right_front_queue, detection_queue);
+  op3::CameraWorker left_rear_worker(
+      op3::CameraPosition::kLeftRear, std::make_unique<op3::MockPersonDetector>(),
+      left_rear_queue, detection_queue);
+  op3::CameraWorker right_rear_worker(
+      op3::CameraPosition::kRightRear, std::make_unique<op3::MockPersonDetector>(),
+      right_rear_queue, detection_queue);
+
+  left_front_worker.start();
+  right_front_worker.start();
+  left_rear_worker.start();
+  right_rear_worker.start();
+
+  std::uint64_t frame_id = 1;
+  auto timestamp = std::chrono::steady_clock::now();
+  for (const op3::FrameInput& frame : frames) {
+    const op3::FrameMessage message{
+        .camera = frame.camera,
+        .frame_id = frame_id++,
+        .timestamp = timestamp,
+        .image = frame.image,
+    };
+
+    // Feed each camera queue independently to mimic unsynchronized camera arrivals.
+    switch (frame.camera) {
+      case op3::CameraPosition::kLeftFront:
+        left_front_queue.push(message);
+        break;
+      case op3::CameraPosition::kRightFront:
+        right_front_queue.push(message);
+        break;
+      case op3::CameraPosition::kLeftRear:
+        left_rear_queue.push(message);
+        break;
+      case op3::CameraPosition::kRightRear:
+        right_rear_queue.push(message);
+        break;
     }
+
+    timestamp += std::chrono::milliseconds(5);
   }
 
-  cv::destroyAllWindows();
-  cmake_demo::log_info("Demo finished cleanly");
+  std::this_thread::sleep_for(std::chrono::milliseconds(60));
+
+  // Shut workers down first, then stop fusion and publishing after input has drained.
+  left_front_queue.close();
+  right_front_queue.close();
+  left_rear_queue.close();
+  right_rear_queue.close();
+
+  left_front_worker.join();
+  right_front_worker.join();
+  left_rear_worker.join();
+  right_rear_worker.join();
+
+  tracker.stop();
+  tracker.join();
+
+  publisher.stop();
+  publisher.join();
+
   return 0;
 }

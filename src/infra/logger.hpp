@@ -9,10 +9,13 @@
 #include <fmt/chrono.h>
 #include <fmt/color.h>
 
-namespace cmake_demo {
+namespace op3 {
 
 namespace detail {
 
+/**
+ * Internal log severity levels used by the lightweight logger.
+ */
 enum class LogLevel {
   kDebug,
   kInfo,
@@ -20,6 +23,9 @@ enum class LogLevel {
   kError,
 };
 
+/**
+ * Maps a log level to its short printable label.
+ */
 inline std::string_view level_name(LogLevel level) {
   switch (level) {
     case LogLevel::kDebug:
@@ -35,6 +41,9 @@ inline std::string_view level_name(LogLevel level) {
   return "INFO";
 }
 
+/**
+ * Maps a log level to its terminal color styling.
+ */
 inline fmt::text_style level_style(LogLevel level) {
   switch (level) {
     case LogLevel::kDebug:
@@ -50,11 +59,17 @@ inline fmt::text_style level_style(LogLevel level) {
   return fmt::fg(fmt::color::white);
 }
 
+/**
+ * Strips a path down to its final filename component for compact logs.
+ */
 inline std::string_view short_file_name(std::string_view path) {
   const std::size_t pos = path.find_last_of("/\\");
   return pos == std::string_view::npos ? path : path.substr(pos + 1);
 }
 
+/**
+ * Formats and prints a fully annotated log line.
+ */
 template <typename... Args>
 void log_message(FILE* stream, LogLevel level, fmt::format_string<Args...> format,
                  const std::source_location& location, Args&&... args) {
@@ -81,6 +96,9 @@ void log_debug_impl(const std::source_location& location, fmt::format_string<Arg
                       std::forward<Args>(args)...);
 }
 
+/**
+ * Emits an info-level log line.
+ */
 template <typename... Args>
 void log_info_impl(const std::source_location& location, fmt::format_string<Args...> format,
                    Args&&... args) {
@@ -88,6 +106,9 @@ void log_info_impl(const std::source_location& location, fmt::format_string<Args
                       std::forward<Args>(args)...);
 }
 
+/**
+ * Emits a warning-level log line.
+ */
 template <typename... Args>
 void log_warn_impl(const std::source_location& location, fmt::format_string<Args...> format,
                    Args&&... args) {
@@ -95,6 +116,9 @@ void log_warn_impl(const std::source_location& location, fmt::format_string<Args
                       std::forward<Args>(args)...);
 }
 
+/**
+ * Emits an error-level log line.
+ */
 template <typename... Args>
 void log_error_impl(const std::source_location& location, fmt::format_string<Args...> format,
                     Args&&... args) {
@@ -102,7 +126,7 @@ void log_error_impl(const std::source_location& location, fmt::format_string<Arg
                       std::forward<Args>(args)...);
 }
 
-}  // namespace cmake_demo
+}  // namespace op3
 
 #define log_debug(...) log_debug_impl(std::source_location::current(), __VA_ARGS__)
 #define log_info(...) log_info_impl(std::source_location::current(), __VA_ARGS__)

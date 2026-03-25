@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cmake_demo VERSION 0.1.0 LANGUAGES CXX)
+project(omni-perception-3se VERSION 0.1.0 LANGUAGES CXX)
 
 include(CTest)
 
@@ -11,44 +11,55 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED COMPONENTS core highgui imgproc videoio)
 
-add_library(cmake_demo_core
-  src/app_config.cpp
+add_library(omni_perception_3se_core
+  src/core/app_config.cpp
+  src/perception/angle_utils.cpp
+  src/perception/camera_worker.cpp
+  src/perception/demo_frames.cpp
+  src/perception/fusion_tracker.cpp
+  src/perception/json_output.cpp
+  src/perception/mock_person_detector.cpp
+  src/perception/state_publisher.cpp
 )
 
-target_include_directories(cmake_demo_core PUBLIC src)
+target_include_directories(omni_perception_3se_core PUBLIC src)
 
-add_executable(cmake_demo src/main.cpp)
-add_executable(logger_demo src/bin/logger_demo.cpp)
-
-target_link_libraries(cmake_demo
-  PRIVATE
-    cmake_demo_core
+target_link_libraries(omni_perception_3se_core
+  PUBLIC
     fmt::fmt
     opencv_core
-    opencv_highgui
     opencv_imgproc
-    opencv_videoio
+)
+
+add_executable(omni-perception-3se src/main.cpp)
+add_executable(logger_demo src/bin/logger_demo.cpp)
+
+target_link_libraries(omni-perception-3se
+  PRIVATE
+    omni_perception_3se_core
+    fmt::fmt
 )
 
 target_link_libraries(logger_demo
   PRIVATE
-    cmake_demo_core
+    omni_perception_3se_core
     fmt::fmt
 )
 
 if(BUILD_TESTING)
   find_package(GTest CONFIG REQUIRED)
 
-  add_executable(cmake_demo_tests
+  add_executable(omni_perception_3se_tests
     tests/app_config_test.cpp
+    tests/pipeline_test.cpp
   )
 
-  target_link_libraries(cmake_demo_tests
+  target_link_libraries(omni_perception_3se_tests
     PRIVATE
-      cmake_demo_core
+      omni_perception_3se_core
       GTest::gtest_main
   )
 
   include(GoogleTest)
-  gtest_discover_tests(cmake_demo_tests)
+  gtest_discover_tests(omni_perception_3se_tests)
 endif()
