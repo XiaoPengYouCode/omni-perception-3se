@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# CMake and generators
+/CMakeCache.txt
+/CMakeFiles/
+/CTestTestfile.cmake
+/Testing/
+/cmake_install.cmake
+/compile_commands.json
+/install_manifest.txt
+/Makefile
+
+# Build directories
+/build/
+/build-*/
+/cmake-build-*/
+
+# Generator-specific artifacts
+*.ninja
+*.ninja_deps
+*.ninja_log
+
+# Test and coverage output
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Editors
+.idea/
+.vscode/
