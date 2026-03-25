@@ -31,14 +31,12 @@ std::vector<PersonReport> process_camera_frame(CameraPosition camera, const cv::
   return reports;
 }
 
-}  // namespace
+} // namespace
 
 CameraWorker::CameraWorker(CameraPosition camera, std::unique_ptr<Detector> detector,
                            BlockingQueue<FrameMessage>& input_queue,
                            BlockingQueue<DetectionMessage>& detection_queue)
-    : camera_(camera),
-      detector_(std::move(detector)),
-      input_queue_(input_queue),
+    : camera_(camera), detector_(std::move(detector)), input_queue_(input_queue),
       detection_queue_(detection_queue) {}
 
 void CameraWorker::start() {
@@ -68,4 +66,4 @@ void CameraWorker::run() {
   }
 }
 
-}  // namespace op3
+} // namespace op3

@@ -4,6 +4,13 @@ set shell := ["sh", "-cu"]
 default:
   @just --list
 
+# Format tracked C++ sources in place with clang-format.
+fmt:
+  files="$(git ls-files 'src/**/*.cpp' 'src/**/*.hpp' 'src/*.cpp' 'src/*.hpp' 'tests/**/*.cpp' 'tests/*.cpp' 'include/**/*.hpp' 'include/*.hpp')"; \
+  if [ -n "$files" ]; then \
+    clang-format -i $files; \
+  fi
+
 # Build a target. Defaults to `omni-perception-3se`. Pass a target name and/or `-r` or `--release`.
 build *args:
   mode=Debug; dir=build; target=omni-perception-3se; \

@@ -32,4 +32,4 @@ std::vector<Detection> MockPersonDetector::detect(const cv::Mat& image) {
   return {Detection{.id = "1", .bbox = bbox, .confidence = 0.95F}};
 }
 
-}  // namespace op3
+} // namespace op3

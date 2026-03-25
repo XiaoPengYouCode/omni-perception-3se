@@ -13,7 +13,7 @@ namespace op3 {
  * Long-lived worker that performs inference for one camera stream.
  */
 class CameraWorker {
- public:
+public:
   /**
    * Creates a worker bound to one camera and one detector instance.
    */
@@ -34,7 +34,7 @@ class CameraWorker {
    */
   void join();
 
- private:
+private:
   /**
    * Consumes frame messages, runs detection, and publishes detection messages.
    */
@@ -47,4 +47,4 @@ class CameraWorker {
   std::thread thread_;
 };
 
-}  // namespace op3
+} // namespace op3

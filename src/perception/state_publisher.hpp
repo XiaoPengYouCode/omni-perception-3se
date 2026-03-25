@@ -14,7 +14,7 @@ namespace op3 {
  * Periodically snapshots the tracker and forwards stable JSON-ready state updates.
  */
 class StatePublisher {
- public:
+public:
   /**
    * Callback invoked for each published tracker snapshot.
    */
@@ -49,7 +49,7 @@ class StatePublisher {
    */
   const std::vector<PipelineOutput>& outputs() const;
 
- private:
+private:
   /**
    * Polls the tracker and emits only new sequence ids.
    */
@@ -64,4 +64,4 @@ class StatePublisher {
   std::thread thread_;
 };
 
-}  // namespace op3
+} // namespace op3

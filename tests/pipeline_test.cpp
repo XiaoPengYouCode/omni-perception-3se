@@ -21,7 +21,7 @@ namespace {
 
 /** Fixed detector used by tests to inject deterministic detections. */
 class FixedDetector final : public op3::Detector {
- public:
+public:
   FixedDetector(std::vector<op3::Detection> detections, int* call_count)
       : detections_(std::move(detections)), call_count_(call_count) {}
 
@@ -32,39 +32,35 @@ class FixedDetector final : public op3::Detector {
     return detections_;
   }
 
- private:
+private:
   std::vector<op3::Detection> detections_;
   int* call_count_;
 };
 
 TEST(CameraPositionToStringTest, ConvertsAllKnownPositions) {
-  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kLeftFront),
-            "left_front");
-  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kRightFront),
-            "right_front");
-  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kLeftRear),
-            "left_rear");
-  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kRightRear),
-            "right_rear");
+  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kLeftFront), "left_front");
+  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kRightFront), "right_front");
+  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kLeftRear), "left_rear");
+  EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kRightRear), "right_rear");
 }
 
 TEST(ComputePersonAngleTest, UsesCameraBaseAngleAtImageCenter) {
-  const double angle = op3::compute_person_angle(
-      op3::CameraPosition::kLeftFront, cv::Rect(450, 100, 60, 200), 960);
+  const double angle =
+      op3::compute_person_angle(op3::CameraPosition::kLeftFront, cv::Rect(450, 100, 60, 200), 960);
 
   EXPECT_NEAR(angle, 45.0, 1e-6);
 }
 
 TEST(ComputePersonAngleTest, AppliesHorizontalOffsetAtImageEdge) {
-  const double angle = op3::compute_person_angle(
-      op3::CameraPosition::kRightFront, cv::Rect(0, 100, 60, 200), 960);
+  const double angle =
+      op3::compute_person_angle(op3::CameraPosition::kRightFront, cv::Rect(0, 100, 60, 200), 960);
 
   EXPECT_NEAR(angle, -87.1875, 1e-6);
 }
 
 TEST(ComputePersonAngleTest, NormalizesRearCameraAnglesToMinus180To180Range) {
-  const double angle = op3::compute_person_angle(
-      op3::CameraPosition::kLeftRear, cv::Rect(900, 100, 60, 200), 960);
+  const double angle =
+      op3::compute_person_angle(op3::CameraPosition::kLeftRear, cv::Rect(900, 100, 60, 200), 960);
 
   EXPECT_NEAR(angle, 177.1875, 1e-6);
 }
@@ -113,8 +109,7 @@ TEST(CameraWorkerTest, EmitsDetectionMessageWithTimestampAndFrameId) {
       op3::CameraPosition::kLeftFront,
       std::make_unique<FixedDetector>(
           std::vector<op3::Detection>{
-              op3::Detection{.id = "cam", .bbox = cv::Rect(80, 20, 40, 100),
-                                    .confidence = 0.9F},
+              op3::Detection{.id = "cam", .bbox = cv::Rect(80, 20, 40, 100), .confidence = 0.9F},
           },
           &call_count),
       input_queue, detection_queue);
@@ -150,15 +145,15 @@ TEST(FusionTrackerTest, AssociatesAsynchronousDetectionsIntoSingleTrack) {
       .camera = op3::CameraPosition::kLeftFront,
       .frame_id = 1,
       .timestamp = base_time,
-      .person = {op3::PersonReport{.id = "1", .angle = 30.0,
-                                   .camera = op3::CameraPosition::kLeftFront}},
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 30.0, .camera = op3::CameraPosition::kLeftFront}},
   });
   detection_queue.push(op3::DetectionMessage{
       .camera = op3::CameraPosition::kRightFront,
       .frame_id = 2,
       .timestamp = base_time + std::chrono::milliseconds(15),
-      .person = {op3::PersonReport{.id = "1", .angle = 34.0,
-                                   .camera = op3::CameraPosition::kRightFront}},
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 34.0, .camera = op3::CameraPosition::kRightFront}},
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -172,10 +167,9 @@ TEST(FusionTrackerTest, AssociatesAsynchronousDetectionsIntoSingleTrack) {
   EXPECT_NEAR(output.person.front().angle, 32.0, 1e-6);
   EXPECT_GT(output.person.front().angle_velocity, 0.0);
   std::vector<op3::CameraPosition> sources = output.person.front().sources;
-  std::sort(sources.begin(), sources.end(),
-            [](op3::CameraPosition lhs, op3::CameraPosition rhs) {
-              return static_cast<int>(lhs) < static_cast<int>(rhs);
-            });
+  std::sort(sources.begin(), sources.end(), [](op3::CameraPosition lhs, op3::CameraPosition rhs) {
+    return static_cast<int>(lhs) < static_cast<int>(rhs);
+  });
   ASSERT_EQ(sources.size(), 2U);
   EXPECT_EQ(sources[0], op3::CameraPosition::kLeftFront);
   EXPECT_EQ(sources[1], op3::CameraPosition::kRightFront);
@@ -187,21 +181,20 @@ TEST(StatePublisherTest, PublishesTrackerSnapshots) {
   tracker.start();
 
   std::atomic<int> publish_count = 0;
-  op3::StatePublisher publisher(
-      tracker, std::chrono::milliseconds(10),
-      [&publish_count](const op3::PipelineOutput& output) {
-        if (output.sequence_id > 0) {
-          ++publish_count;
-        }
-      });
+  op3::StatePublisher publisher(tracker, std::chrono::milliseconds(10),
+                                [&publish_count](const op3::PipelineOutput& output) {
+                                  if (output.sequence_id > 0) {
+                                    ++publish_count;
+                                  }
+                                });
   publisher.start();
 
   detection_queue.push(op3::DetectionMessage{
       .camera = op3::CameraPosition::kLeftFront,
       .frame_id = 5,
       .timestamp = std::chrono::steady_clock::now(),
-      .person = {op3::PersonReport{.id = "1", .angle = 30.0,
-                                   .camera = op3::CameraPosition::kLeftFront}},
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 30.0, .camera = op3::CameraPosition::kLeftFront}},
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(30));
@@ -242,10 +235,10 @@ TEST(ToJsonTest, SerializesTrackedPersonState) {
 
   const std::string json = op3::to_json(output);
 
-  EXPECT_EQ(
-      json,
-      "{\"sequence_id\":9,\"timestamp_ms\":300,\"person\":[{\"track_id\":\"track-1\",\"angle\":30.0,"
-      "\"angle_velocity\":1.5,\"confidence\":0.95,\"sources\":[\"left_front\"],\"last_update_ms\":250}]}");
+  EXPECT_EQ(json, "{\"sequence_id\":9,\"timestamp_ms\":300,\"person\":[{\"track_id\":\"track-1\","
+                  "\"angle\":30.0,"
+                  "\"angle_velocity\":1.5,\"confidence\":0.95,\"sources\":[\"left_front\"],\"last_"
+                  "update_ms\":250}]}");
 }
 
-}  // namespace
+} // namespace

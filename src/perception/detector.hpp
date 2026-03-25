@@ -10,7 +10,7 @@ namespace op3 {
  * Interface for any per-camera person detector backend.
  */
 class Detector {
- public:
+public:
   /**
    * Virtual destructor for polymorphic use.
    */
@@ -25,4 +25,4 @@ class Detector {
   virtual std::vector<Detection> detect(const cv::Mat& image) = 0;
 };
 
-}  // namespace op3
+} // namespace op3

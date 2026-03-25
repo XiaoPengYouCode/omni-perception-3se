@@ -21,8 +21,7 @@ TEST(ParseCameraIdsTest, ParsesExplicitIds) {
 }
 
 TEST(ParseCameraIdsTest, RejectsMalformedIds) {
-  EXPECT_THROW(op3::parse_camera_ids(std::vector<std::string>{"1x"}),
-               std::invalid_argument);
+  EXPECT_THROW(op3::parse_camera_ids(std::vector<std::string>{"1x"}), std::invalid_argument);
 }
 
 TEST(ComputeGridShapeTest, BuildsSingleTileGrid) {
@@ -46,4 +45,4 @@ TEST(ComputeGridShapeTest, ReturnsZeroShapeForEmptyGrid) {
   EXPECT_EQ(shape.columns, 0);
 }
 
-}  // namespace
+} // namespace

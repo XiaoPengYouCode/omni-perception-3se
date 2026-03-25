@@ -11,4 +11,4 @@ namespace op3 {
  */
 std::string to_json(const PipelineOutput& output);
 
-}  // namespace op3
+} // namespace op3

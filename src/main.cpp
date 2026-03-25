@@ -31,29 +31,28 @@ int main() {
   op3::FusionTracker tracker(detection_queue);
   tracker.start();
 
-  op3::StatePublisher publisher(
-      tracker, std::chrono::milliseconds(20),
-      [](const op3::PipelineOutput& output) {
-        if (output.sequence_id == 0) {
-          return;
-        }
-        fmt::print("{}\n", op3::to_json(output));
-      });
+  op3::StatePublisher publisher(tracker, std::chrono::milliseconds(20),
+                                [](const op3::PipelineOutput& output) {
+                                  if (output.sequence_id == 0) {
+                                    return;
+                                  }
+                                  fmt::print("{}\n", op3::to_json(output));
+                                });
   publisher.start();
 
   // Each camera owns its own detector instance and worker thread.
-  op3::CameraWorker left_front_worker(
-      op3::CameraPosition::kLeftFront, std::make_unique<op3::MockPersonDetector>(),
-      left_front_queue, detection_queue);
-  op3::CameraWorker right_front_worker(
-      op3::CameraPosition::kRightFront, std::make_unique<op3::MockPersonDetector>(),
-      right_front_queue, detection_queue);
-  op3::CameraWorker left_rear_worker(
-      op3::CameraPosition::kLeftRear, std::make_unique<op3::MockPersonDetector>(),
-      left_rear_queue, detection_queue);
-  op3::CameraWorker right_rear_worker(
-      op3::CameraPosition::kRightRear, std::make_unique<op3::MockPersonDetector>(),
-      right_rear_queue, detection_queue);
+  op3::CameraWorker left_front_worker(op3::CameraPosition::kLeftFront,
+                                      std::make_unique<op3::MockPersonDetector>(), left_front_queue,
+                                      detection_queue);
+  op3::CameraWorker right_front_worker(op3::CameraPosition::kRightFront,
+                                       std::make_unique<op3::MockPersonDetector>(),
+                                       right_front_queue, detection_queue);
+  op3::CameraWorker left_rear_worker(op3::CameraPosition::kLeftRear,
+                                     std::make_unique<op3::MockPersonDetector>(), left_rear_queue,
+                                     detection_queue);
+  op3::CameraWorker right_rear_worker(op3::CameraPosition::kRightRear,
+                                      std::make_unique<op3::MockPersonDetector>(), right_rear_queue,
+                                      detection_queue);
 
   left_front_worker.start();
   right_front_worker.start();
@@ -72,18 +71,18 @@ int main() {
 
     // Feed each camera queue independently to mimic unsynchronized camera arrivals.
     switch (frame.camera) {
-      case op3::CameraPosition::kLeftFront:
-        left_front_queue.push(message);
-        break;
-      case op3::CameraPosition::kRightFront:
-        right_front_queue.push(message);
-        break;
-      case op3::CameraPosition::kLeftRear:
-        left_rear_queue.push(message);
-        break;
-      case op3::CameraPosition::kRightRear:
-        right_rear_queue.push(message);
-        break;
+    case op3::CameraPosition::kLeftFront:
+      left_front_queue.push(message);
+      break;
+    case op3::CameraPosition::kRightFront:
+      right_front_queue.push(message);
+      break;
+    case op3::CameraPosition::kLeftRear:
+      left_rear_queue.push(message);
+      break;
+    case op3::CameraPosition::kRightRear:
+      right_rear_queue.push(message);
+      break;
     }
 
     timestamp += std::chrono::milliseconds(5);

@@ -87,4 +87,4 @@ struct PipelineOutput {
   std::vector<TrackedPerson> person;
 };
 
-}  // namespace op3
+} // namespace op3

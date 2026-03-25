@@ -14,7 +14,7 @@ namespace op3 {
  * Maintains fused person tracks from asynchronous per-camera detections.
  */
 class FusionTracker {
- public:
+public:
   /**
    * Creates a tracker with simple angle-based data association parameters.
    */
@@ -44,7 +44,7 @@ class FusionTracker {
    */
   PipelineOutput snapshot() const;
 
- private:
+private:
   /**
    * Internal mutable track state owned by the fusion thread.
    */
@@ -78,4 +78,4 @@ class FusionTracker {
   std::thread thread_;
 };
 
-}  // namespace op3
+} // namespace op3

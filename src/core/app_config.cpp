@@ -5,8 +5,7 @@
 
 namespace op3 {
 
-std::vector<int> parse_camera_ids(const std::vector<std::string>& args,
-                                  int default_camera_count) {
+std::vector<int> parse_camera_ids(const std::vector<std::string>& args, int default_camera_count) {
   std::vector<int> camera_ids;
   camera_ids.reserve(args.size());
 
@@ -43,4 +42,4 @@ GridShape compute_grid_shape(int tile_count) {
   return {.rows = rows, .columns = columns};
 }
 
-}  // namespace op3
+} // namespace op3

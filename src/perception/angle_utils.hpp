@@ -33,4 +33,4 @@ double compute_person_angle(CameraPosition camera, const cv::Rect& bbox, int ima
  */
 std::string camera_position_to_string(CameraPosition camera);
 
-}  // namespace op3
+} // namespace op3

@@ -5,12 +5,9 @@
 
 namespace op3 {
 
-StatePublisher::StatePublisher(FusionTracker& tracker,
-                               std::chrono::milliseconds publish_interval,
+StatePublisher::StatePublisher(FusionTracker& tracker, std::chrono::milliseconds publish_interval,
                                OutputCallback on_output)
-    : tracker_(tracker),
-      publish_interval_(publish_interval),
-      on_output_(std::move(on_output)) {}
+    : tracker_(tracker), publish_interval_(publish_interval), on_output_(std::move(on_output)) {}
 
 void StatePublisher::start() {
   thread_ = std::thread([this] { run(); });
@@ -71,4 +68,4 @@ void StatePublisher::run() {
   }
 }
 
-}  // namespace op3
+} // namespace op3

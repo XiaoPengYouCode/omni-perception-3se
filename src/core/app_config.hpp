@@ -31,4 +31,4 @@ std::vector<int> parse_camera_ids(const std::vector<std::string>& args,
  */
 GridShape compute_grid_shape(int tile_count);
 
-}  // namespace op3
+} // namespace op3

@@ -1,0 +1,9 @@
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "clang-format"
+name = "clang-format"
+entry = "clang-format --dry-run --Werror"
+language = "system"
+files = "^(src|tests|include)/.*\\.(cpp|hpp)$"

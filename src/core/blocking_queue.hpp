@@ -14,9 +14,8 @@ namespace op3 {
  * This queue is used for real-time style pipelines where stale work is less useful
  * than the most recent message.
  */
-template <typename T>
-class BlockingQueue {
- public:
+template <typename T> class BlockingQueue {
+public:
   /**
    * Creates a queue with a fixed maximum number of retained items.
    *
@@ -83,7 +82,7 @@ class BlockingQueue {
     return queue_.size();
   }
 
- private:
+private:
   std::size_t capacity_;
   mutable std::mutex mutex_;
   std::condition_variable cv_;
@@ -91,4 +90,4 @@ class BlockingQueue {
   bool closed_ = false;
 };
 
-}  // namespace op3
+} // namespace op3

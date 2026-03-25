@@ -19,24 +19,24 @@ std::string json_escape(const std::string& value) {
 
   for (const char ch : value) {
     switch (ch) {
-      case '\\':
-        escaped += "\\\\";
-        break;
-      case '"':
-        escaped += "\\\"";
-        break;
-      case '\n':
-        escaped += "\\n";
-        break;
-      case '\r':
-        escaped += "\\r";
-        break;
-      case '\t':
-        escaped += "\\t";
-        break;
-      default:
-        escaped.push_back(ch);
-        break;
+    case '\\':
+      escaped += "\\\\";
+      break;
+    case '"':
+      escaped += "\\\"";
+      break;
+    case '\n':
+      escaped += "\\n";
+      break;
+    case '\r':
+      escaped += "\\r";
+      break;
+    case '\t':
+      escaped += "\\t";
+      break;
+    default:
+      escaped.push_back(ch);
+      break;
     }
   }
 
@@ -51,12 +51,11 @@ std::int64_t to_epoch_milliseconds(std::chrono::steady_clock::time_point timesta
       std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count());
 }
 
-}  // namespace
+} // namespace
 
 std::string to_json(const PipelineOutput& output) {
-  std::string json =
-      fmt::format("{{\"sequence_id\":{},\"timestamp_ms\":{},\"person\":[", output.sequence_id,
-                  output.timestamp_ms);
+  std::string json = fmt::format("{{\"sequence_id\":{},\"timestamp_ms\":{},\"person\":[",
+                                 output.sequence_id, output.timestamp_ms);
 
   // Serialize the current fused tracks as a flat array of state objects.
   for (std::size_t i = 0; i < output.person.size(); ++i) {
@@ -85,4 +84,4 @@ std::string to_json(const PipelineOutput& output) {
   return json;
 }
 
-}  // namespace op3
+} // namespace op3

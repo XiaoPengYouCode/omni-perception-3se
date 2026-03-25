@@ -28,12 +28,11 @@ std::int64_t to_epoch_milliseconds(std::chrono::steady_clock::time_point timesta
       std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count());
 }
 
-}  // namespace
+} // namespace
 
 FusionTracker::FusionTracker(BlockingQueue<DetectionMessage>& detection_queue,
                              double association_gate_degrees, double smoothing_gain)
-    : detection_queue_(detection_queue),
-      association_gate_degrees_(association_gate_degrees),
+    : detection_queue_(detection_queue), association_gate_degrees_(association_gate_degrees),
       smoothing_gain_(smoothing_gain) {}
 
 void FusionTracker::start() {
@@ -129,4 +128,4 @@ void FusionTracker::ingest(const DetectionMessage& message) {
   }
 }
 
-}  // namespace op3
+} // namespace op3

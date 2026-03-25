@@ -11,4 +11,4 @@ namespace op3 {
  */
 std::vector<FrameInput> make_demo_frames(int image_width = 960, int image_height = 540);
 
-}  // namespace op3
+} // namespace op3

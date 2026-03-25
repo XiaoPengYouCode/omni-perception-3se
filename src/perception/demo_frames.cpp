@@ -25,11 +25,10 @@ void draw_mock_person(cv::Mat& image, int center_x) {
   const int top = std::max(0, image.rows / 2 - kPersonRectHeight / 2);
   const int height = std::min(kPersonRectHeight, image.rows - top);
 
-  cv::rectangle(image, cv::Rect(left, top, kPersonRectWidth, height), kForegroundColor,
-                cv::FILLED);
+  cv::rectangle(image, cv::Rect(left, top, kPersonRectWidth, height), kForegroundColor, cv::FILLED);
 }
 
-}  // namespace
+} // namespace
 
 std::vector<FrameInput> make_demo_frames(int image_width, int image_height) {
   std::vector<FrameInput> frames;
@@ -54,4 +53,4 @@ std::vector<FrameInput> make_demo_frames(int image_width, int image_height) {
   return frames;
 }
 
-}  // namespace op3
+} // namespace op3

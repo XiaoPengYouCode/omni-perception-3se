@@ -7,14 +7,14 @@ namespace op3 {
 
 double camera_base_angle(CameraPosition camera) {
   switch (camera) {
-    case CameraPosition::kLeftFront:
-      return 45.0;
-    case CameraPosition::kRightFront:
-      return -45.0;
-    case CameraPosition::kLeftRear:
-      return 135.0;
-    case CameraPosition::kRightRear:
-      return -135.0;
+  case CameraPosition::kLeftFront:
+    return 45.0;
+  case CameraPosition::kRightFront:
+    return -45.0;
+  case CameraPosition::kLeftRear:
+    return 135.0;
+  case CameraPosition::kRightRear:
+    return -135.0;
   }
 
   throw std::invalid_argument("unknown camera position");
@@ -44,17 +44,17 @@ double compute_person_angle(CameraPosition camera, const cv::Rect& bbox, int ima
 
 std::string camera_position_to_string(CameraPosition camera) {
   switch (camera) {
-    case CameraPosition::kLeftFront:
-      return "left_front";
-    case CameraPosition::kRightFront:
-      return "right_front";
-    case CameraPosition::kLeftRear:
-      return "left_rear";
-    case CameraPosition::kRightRear:
-      return "right_rear";
+  case CameraPosition::kLeftFront:
+    return "left_front";
+  case CameraPosition::kRightFront:
+    return "right_front";
+  case CameraPosition::kLeftRear:
+    return "left_rear";
+  case CameraPosition::kRightRear:
+    return "right_rear";
   }
 
   throw std::invalid_argument("unknown camera position");
 }
 
-}  // namespace op3
+} // namespace op3
