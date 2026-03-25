@@ -9,7 +9,7 @@ This project starts with a small but sane foundation:
 - `GoogleTest` for early unit tests
 - `vcpkg` manifest mode for dependency management
 
-The first app version opens multiple cameras with OpenCV and shows them in a single window.
+The current app version creates a simple image with OpenCV, shows it in a window, and logs progress with fmt.
 
 ## Docker
 
@@ -51,9 +51,9 @@ ctest --test-dir build-docker --output-on-failure
 
 Default behavior:
 
-- Open camera `0`, `1`, `2`
-- Read frames continuously
-- Show all streams in one grid view
+- Create a simple image in memory
+- Show it in an OpenCV window
+- Print logs through `fmt` helpers
 - Press `q` or `Esc` to quit
 
 ## Dependency
@@ -94,20 +94,13 @@ ctest --test-dir build --output-on-failure
 ./build/cmake_demo
 ```
 
-You can also pass camera ids explicitly:
-
-```bash
-./build/cmake_demo 0 1 2
-```
-
-If one camera fails to open, the app still runs and shows a `No signal` tile for that slot.
 
 ## Files
 
 - `vcpkg.json`: declares the OpenCV dependency
 - `CMakePresets.json`: preset for `vcpkg`
-- `include/cmake_demo/logger.hpp`: small `fmt`-based logging helpers
-- `tests/app_config_test.cpp`: early unit tests for non-hardware logic
+- `src/logger.hpp`: small `fmt`-based logging helpers
+- `tests/app_config_test.cpp`: unit tests for small parsing/grid helpers
 
 ## Notes
 

@@ -1,4 +1,4 @@
-#include "cmake_demo/app_config.hpp"
+#include "app_config.hpp"
 
 #include <cmath>
 #include <stdexcept>

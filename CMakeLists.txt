@@ -15,9 +15,10 @@ add_library(cmake_demo_core
   src/app_config.cpp
 )
 
-target_include_directories(cmake_demo_core PUBLIC include)
+target_include_directories(cmake_demo_core PUBLIC src)
 
 add_executable(cmake_demo src/main.cpp)
+add_executable(logger_demo src/bin/logger_demo.cpp)
 
 target_link_libraries(cmake_demo
   PRIVATE
@@ -27,6 +28,12 @@ target_link_libraries(cmake_demo
     opencv_highgui
     opencv_imgproc
     opencv_videoio
+)
+
+target_link_libraries(logger_demo
+  PRIVATE
+    cmake_demo_core
+    fmt::fmt
 )
 
 if(BUILD_TESTING)
