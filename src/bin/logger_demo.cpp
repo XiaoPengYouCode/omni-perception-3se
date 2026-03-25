@@ -1,9 +1,10 @@
-#include "logger.hpp"
+/** Simple executable that exercises the logger formatting helpers. */
+#include "infra/logger.hpp"
 
 int main() {
-  cmake_demo::log_debug("Debug message");
-  cmake_demo::log_info("Info message");
-  cmake_demo::log_warn("Warn message");
-  cmake_demo::log_error("Error message");
+  op3::log_debug("Debug message");
+  op3::log_info("Info message");
+  op3::log_warn("Warn message");
+  op3::log_error("Error message");
   return 0;
 }

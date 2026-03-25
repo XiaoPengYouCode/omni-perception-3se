@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git "${VCPKG_ROOT}" \
   && "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
 
-WORKDIR /tmp/cmake-demo-deps
+WORKDIR /tmp/omni-perception-3se-deps
 COPY vcpkg.json .
 RUN vcpkg install --clean-after-build
 

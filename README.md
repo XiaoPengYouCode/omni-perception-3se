@@ -1,4 +1,4 @@
-# cmake-demo
+# omni-perception-3se
 
 Minimal C++ project managed by CMake.
 
@@ -30,13 +30,13 @@ So the clean split is:
 Build the image:
 
 ```bash
-docker build -t cmake-demo-dev .
+docker build -t omni-perception-3se-dev .
 ```
 
 Run a shell in the container:
 
 ```bash
-docker run --rm -it -v "$PWD:/workspace" cmake-demo-dev
+docker run --rm -it -v "$PWD:/workspace" omni-perception-3se-dev
 ```
 
 Build and test inside the container:
@@ -91,7 +91,7 @@ ctest --test-dir build --output-on-failure
 ## Run
 
 ```bash
-./build/cmake_demo
+./build/omni-perception-3se
 ```
 
 
@@ -99,7 +99,7 @@ ctest --test-dir build --output-on-failure
 
 - `vcpkg.json`: declares the OpenCV dependency
 - `CMakePresets.json`: preset for `vcpkg`
-- `src/logger.hpp`: small `fmt`-based logging helpers
+- `src/infra/logger.hpp`: small `fmt`-based logging helpers
 - `tests/app_config_test.cpp`: unit tests for small parsing/grid helpers
 
 ## Notes
