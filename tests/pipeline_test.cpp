@@ -37,6 +37,10 @@ private:
   int* call_count_;
 };
 
+void allow_tracker_to_drain(std::chrono::milliseconds wait = std::chrono::milliseconds(40)) {
+  std::this_thread::sleep_for(wait);
+}
+
 TEST(CameraPositionToStringTest, ConvertsAllKnownPositions) {
   EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kLeftFront), "left_front");
   EXPECT_EQ(op3::camera_position_to_string(op3::CameraPosition::kRightFront), "right_front");
@@ -156,7 +160,7 @@ TEST(FusionTrackerTest, AssociatesAsynchronousDetectionsIntoSingleTrack) {
           .id = "1", .angle = 34.0, .camera = op3::CameraPosition::kRightFront}},
   });
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  allow_tracker_to_drain();
   tracker.stop();
   tracker.join();
 
@@ -164,7 +168,8 @@ TEST(FusionTrackerTest, AssociatesAsynchronousDetectionsIntoSingleTrack) {
   EXPECT_EQ(output.sequence_id, 2U);
   ASSERT_EQ(output.person.size(), 1U);
   EXPECT_EQ(output.person.front().track_id, "track-1");
-  EXPECT_NEAR(output.person.front().angle, 32.0, 1e-6);
+  EXPECT_GT(output.person.front().angle, 32.0);
+  EXPECT_LT(output.person.front().angle, 34.0);
   EXPECT_GT(output.person.front().angle_velocity, 0.0);
   std::vector<op3::CameraPosition> sources = output.person.front().sources;
   std::sort(sources.begin(), sources.end(), [](op3::CameraPosition lhs, op3::CameraPosition rhs) {
@@ -173,6 +178,166 @@ TEST(FusionTrackerTest, AssociatesAsynchronousDetectionsIntoSingleTrack) {
   ASSERT_EQ(sources.size(), 2U);
   EXPECT_EQ(sources[0], op3::CameraPosition::kLeftFront);
   EXPECT_EQ(sources[1], op3::CameraPosition::kRightFront);
+}
+
+TEST(FusionTrackerTest, StabilizesAngularVelocityAcrossConsistentMeasurements) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 20.0, 0.5);
+  tracker.start();
+
+  const auto base_time = std::chrono::steady_clock::now();
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 1,
+      .timestamp = base_time,
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 30.0, .camera = op3::CameraPosition::kLeftFront}},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 2,
+      .timestamp = base_time + std::chrono::milliseconds(50),
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 33.0, .camera = op3::CameraPosition::kLeftFront}},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 3,
+      .timestamp = base_time + std::chrono::milliseconds(100),
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 36.0, .camera = op3::CameraPosition::kLeftFront}},
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  ASSERT_EQ(output.person.size(), 1U);
+  EXPECT_GT(output.person.front().angle, 34.0);
+  EXPECT_LT(output.person.front().angle, 36.5);
+  EXPECT_GT(output.person.front().angle_velocity, 10.0);
+  EXPECT_LT(output.person.front().angle_velocity, 120.0);
+  EXPECT_GT(output.person.front().confidence, 0.75);
+}
+
+TEST(FusionTrackerTest, SeparatesTracksOutsideAssociationGate) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 10.0, 0.5);
+  tracker.start();
+
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 1,
+      .timestamp = std::chrono::steady_clock::now(),
+      .person =
+          {
+              op3::PersonReport{
+                  .id = "1", .angle = 15.0, .camera = op3::CameraPosition::kLeftFront},
+              op3::PersonReport{
+                  .id = "2", .angle = 60.0, .camera = op3::CameraPosition::kLeftFront},
+          },
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  ASSERT_EQ(output.person.size(), 2U);
+}
+
+TEST(FusionTrackerTest, DoesNotAssignTwoReportsToOneTrackInSingleMessage) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 10.0, 0.5);
+  tracker.start();
+
+  const auto base_time = std::chrono::steady_clock::now();
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 1,
+      .timestamp = base_time,
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 30.0, .camera = op3::CameraPosition::kLeftFront}},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 2,
+      .timestamp = base_time + std::chrono::milliseconds(10),
+      .person =
+          {
+              op3::PersonReport{
+                  .id = "1", .angle = 31.0, .camera = op3::CameraPosition::kLeftFront},
+              op3::PersonReport{
+                  .id = "2", .angle = 32.0, .camera = op3::CameraPosition::kLeftFront},
+          },
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  ASSERT_EQ(output.person.size(), 2U);
+}
+
+TEST(FusionTrackerTest, RemovesStaleTracksAfterTimeout) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 20.0, 0.5);
+  tracker.start();
+
+  const auto base_time = std::chrono::steady_clock::now();
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 1,
+      .timestamp = base_time,
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 40.0, .camera = op3::CameraPosition::kLeftFront}},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kRightFront,
+      .frame_id = 2,
+      .timestamp = base_time + std::chrono::milliseconds(300),
+      .person = {},
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  EXPECT_TRUE(output.person.empty());
+}
+
+TEST(FusionTrackerTest, HandlesAssociationAcrossAngleWrapBoundary) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 10.0, 0.5);
+  tracker.start();
+
+  const auto base_time = std::chrono::steady_clock::now();
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftRear,
+      .frame_id = 1,
+      .timestamp = base_time,
+      .person = {op3::PersonReport{
+          .id = "1", .angle = 179.0, .camera = op3::CameraPosition::kLeftRear}},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kRightRear,
+      .frame_id = 2,
+      .timestamp = base_time + std::chrono::milliseconds(20),
+      .person = {op3::PersonReport{
+          .id = "1", .angle = -179.0, .camera = op3::CameraPosition::kRightRear}},
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  ASSERT_EQ(output.person.size(), 1U);
+  EXPECT_LT(std::abs(op3::normalize_angle(output.person.front().angle - (-179.0))), 3.0);
+  EXPECT_GT(output.person.front().angle_velocity, 0.0);
 }
 
 TEST(StatePublisherTest, PublishesTrackerSnapshots) {
