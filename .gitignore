@@ -15,6 +15,7 @@
 /build/
 /build-*/
 /cmake-build-*/
+/vcpkg_installed/
 
 # Generator-specific artifacts
 *.ninja
