@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <thread>
 
@@ -14,12 +15,23 @@ namespace op3 {
  */
 class CameraWorker {
 public:
+  using DetectionCallback = std::function<void(const FrameMessage&, const std::vector<Detection>&,
+                                               const std::vector<PersonReport>&)>;
+
   /**
    * Creates a worker bound to one camera and one detector instance.
    */
   CameraWorker(CameraPosition camera, std::unique_ptr<Detector> detector,
                BlockingQueue<FrameMessage>& input_queue,
                BlockingQueue<DetectionMessage>& detection_queue);
+
+  /**
+   * Creates a worker bound to one explicit camera model and optional observer callback.
+   */
+  CameraWorker(CameraModel camera_model, std::unique_ptr<Detector> detector,
+               BlockingQueue<FrameMessage>& input_queue,
+               BlockingQueue<DetectionMessage>& detection_queue,
+               DetectionCallback on_detection = nullptr);
 
   CameraWorker(const CameraWorker&) = delete;
   CameraWorker& operator=(const CameraWorker&) = delete;
@@ -40,10 +52,11 @@ private:
    */
   void run();
 
-  CameraPosition camera_;
+  CameraModel camera_model_;
   std::unique_ptr<Detector> detector_;
   BlockingQueue<FrameMessage>& input_queue_;
   BlockingQueue<DetectionMessage>& detection_queue_;
+  DetectionCallback on_detection_;
   std::thread thread_;
 };
 

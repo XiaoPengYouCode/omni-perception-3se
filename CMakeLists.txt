@@ -15,11 +15,15 @@ add_library(omni_perception_3se_core
   src/core/app_config.cpp
   src/perception/angle_utils.cpp
   src/perception/camera_worker.cpp
+  src/perception/detector_factory.cpp
   src/perception/demo_frames.cpp
   src/perception/fusion_tracker.cpp
   src/perception/json_output.cpp
   src/perception/mock_person_detector.cpp
+  src/perception/scene_labels.cpp
   src/perception/state_publisher.cpp
+  src/perception/yolo26_nano_detector.cpp
+  src/simulation/simulation_engine.cpp
 )
 
 target_include_directories(omni_perception_3se_core PUBLIC src)
@@ -38,6 +42,7 @@ target_link_libraries(omni-perception-3se
   PRIVATE
     omni_perception_3se_core
     fmt::fmt
+    opencv_highgui
 )
 
 target_link_libraries(logger_demo
@@ -52,6 +57,7 @@ if(BUILD_TESTING)
   add_executable(omni_perception_3se_tests
     tests/app_config_test.cpp
     tests/pipeline_test.cpp
+    tests/simulation_test.cpp
   )
 
   target_link_libraries(omni_perception_3se_tests

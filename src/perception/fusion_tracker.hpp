@@ -18,8 +18,8 @@ public:
   /**
    * Creates a tracker with simple angle-based data association parameters.
    */
-  FusionTracker(BlockingQueue<DetectionMessage>& detection_queue,
-                double association_gate_degrees = 20.0, double smoothing_gain = 0.35);
+  FusionTracker(BlockingQueue<DetectionMessage>& detection_queue, double association_gate_m = 1.5,
+                double position_gain = 0.45, double velocity_gain = 0.3);
 
   FusionTracker(const FusionTracker&) = delete;
   FusionTracker& operator=(const FusionTracker&) = delete;
@@ -50,12 +50,13 @@ private:
    */
   struct TrackState {
     std::string track_id;
-    double angle;
-    double angle_velocity;
-    double covariance_00;
-    double covariance_01;
-    double covariance_10;
-    double covariance_11;
+    std::string label;
+    double world_x_m;
+    double world_y_m;
+    double vx_mps;
+    double vy_mps;
+    double range_m;
+    double radius_m;
     double confidence;
     std::vector<CameraPosition> sources;
     std::chrono::steady_clock::time_point state_timestamp;
@@ -81,7 +82,7 @@ private:
   void predict_track(TrackState& track, std::chrono::steady_clock::time_point timestamp) const;
 
   /**
-   * Applies a scalar angle measurement update to a predicted track.
+   * Applies a planar position measurement update to a predicted track.
    */
   void update_track(TrackState& track, const PersonReport& report,
                     std::chrono::steady_clock::time_point timestamp) const;
@@ -96,14 +97,26 @@ private:
    */
   void prune_stale_tracks(std::chrono::steady_clock::time_point timestamp);
 
+  /**
+   * Enforces the scene constraint that each non-empty label can map to at most one fused track.
+   */
+  void enforce_unique_labeled_tracks();
+
+  /**
+   * Returns planar distance from a track prediction to a report.
+   */
+  double association_distance(const TrackState& track, const PersonReport& report) const;
+
   BlockingQueue<DetectionMessage>& detection_queue_;
-  double association_gate_degrees_;
-  double smoothing_gain_;
+  double association_gate_m_;
+  double position_gain_;
+  double velocity_gain_;
   mutable std::mutex mutex_;
   std::vector<TrackState> tracks_;
   std::uint64_t next_track_id_ = 1;
   std::uint64_t latest_sequence_id_ = 0;
   std::chrono::steady_clock::time_point latest_timestamp_{};
+  RobotPose latest_robot_pose_{};
   std::thread thread_;
 };
 

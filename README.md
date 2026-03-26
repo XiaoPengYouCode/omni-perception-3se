@@ -2,15 +2,17 @@
 
 Minimal C++ perception pipeline demo managed by CMake.
 
-This repo is no longer just an OpenCV window sample. The current app builds a small multi-threaded pipeline that:
+This repo now builds a small multi-threaded perception demo around an in-process 2D simulator:
 
-- generates four synthetic camera frames
-- runs a mock person detector per camera
-- converts detections into robot-centric angles
-- fuses asynchronous observations into persistent tracks
+- simulates a robot moving in a 2D scene with four fixed camera mounts
+- simulates pedestrians walking along waypoint loops
+- renders four synthetic camera frames each tick
+- runs one mock-backed `yolo26-nano` detector instance per camera
+- converts detections into robot-centric 2D observations
+- fuses asynchronous observations into persistent 2D tracks
 - prints fused state as line-delimited JSON
 
-The point is simple: keep the pipeline runnable and testable without real cameras, GPU inference, or ROS.
+The point is simple: keep the pipeline runnable and testable without real cameras, GPU inference, physics engines, or ROS.
 
 ## What It Does
 
@@ -21,25 +23,26 @@ The executable [`omni-perception-3se`](/Users/flamingo/Projects/cmake-demo/src/m
 - `left_rear`
 - `right_rear`
 
-Each camera gets its own queue and worker thread. A `MockPersonDetector` finds dark rectangular blobs in synthetic frames. Those detections are converted into angles around the robot body, then a `FusionTracker` associates nearby observations into tracks such as `track-1`.
+Each camera gets its own queue and worker thread. A mock-backed `Yolo26NanoDetector` finds dark rectangular blobs in synthetic frames. Those detections are converted into approximate body-frame position reports, then a `FusionTracker` associates nearby observations into tracks such as `track-1`.
 
 `StatePublisher` snapshots the latest fused state and prints compact JSON to stdout.
 
 Typical output looks like this:
 
 ```json
-{"sequence_id":4,"timestamp_ms":1036050526,"person":[{"track_id":"track-1","angle":30.0,"angle_velocity":0.0,"confidence":1.00,"sources":["left_front"],"last_update_ms":1036050511},{"track_id":"track-2","angle":135.0,"angle_velocity":0.0,"confidence":1.00,"sources":["left_rear"],"last_update_ms":1036050521},{"track_id":"track-3","angle":-30.0,"angle_velocity":0.0,"confidence":1.00,"sources":["right_front"],"last_update_ms":1036050516}]}
+{"sequence_id":42,"timestamp_ms":1036050526,"person":[{"track_id":"track-1","x_m":4.65,"y_m":2.48,"vx_mps":0.24,"vy_mps":-0.03,"range_m":5.27,"radius_m":0.57,"angle":28.1,"angle_velocity":-0.8,"confidence":0.91,"sources":["left_front","right_front"],"last_update_ms":1036050511}]}
 ```
 
-Right now the demo frames contain three visible synthetic people across four cameras, so you should expect three fused tracks.
+The simulator starts with three walking pedestrians, so you should expect one to three fused tracks depending on robot pose and camera visibility.
 
 ## Project Layout
 
 - [`src/main.cpp`](/Users/flamingo/Projects/cmake-demo/src/main.cpp): wires the end-to-end demo pipeline together
-- [`src/perception/demo_frames.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/demo_frames.cpp): creates synthetic camera images
-- [`src/perception/mock_person_detector.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/mock_person_detector.cpp): detects dark blobs as fake people
+- [`src/simulation/simulation_engine.cpp`](/Users/flamingo/Projects/cmake-demo/src/simulation/simulation_engine.cpp): advances the robot/pedestrian world and renders camera images
+- [`src/perception/yolo26_nano_detector.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/yolo26_nano_detector.cpp): mock-backed per-camera detector adapter
+- [`src/perception/mock_person_detector.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/mock_person_detector.cpp): finds dark blobs inside synthetic images
 - [`src/perception/camera_worker.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/camera_worker.cpp): runs per-camera detection and emits observations
-- [`src/perception/fusion_tracker.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/fusion_tracker.cpp): associates observations into tracks
+- [`src/perception/fusion_tracker.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/fusion_tracker.cpp): associates 2D observations into tracks
 - [`src/perception/state_publisher.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/state_publisher.cpp): publishes snapshots from the tracker
 - [`src/perception/json_output.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/json_output.cpp): serializes pipeline state into JSON
 - [`src/core/blocking_queue.hpp`](/Users/flamingo/Projects/cmake-demo/src/core/blocking_queue.hpp): tiny bounded queue used between threads
@@ -107,12 +110,14 @@ Current tests cover:
 
 - camera id parsing and grid helpers
 - angle normalization and camera-angle conversion
+- monocular range estimation
 - mock detection behavior
 - queue overwrite behavior
 - camera worker message emission
-- fusion of asynchronous detections
+- fusion of asynchronous 2D detections
 - state publishing
 - JSON serialization
+- simulation stepping and rendering
 
 ## Run
 
@@ -126,7 +131,7 @@ Or:
 just run
 ```
 
-The program writes JSON lines to stdout. It does not open a GUI window and does not require physical cameras.
+The program opens a small control window for keyboard input, writes JSON lines to stdout, and does not require physical cameras.
 
 ## Docker
 
@@ -160,7 +165,8 @@ This is still intentionally small and fake in the right places:
 
 - input frames are synthetic
 - detection is a deterministic mock, not a real ML model
-- fusion uses simple angular nearest-neighbor association
+- fusion uses simple 2D nearest-neighbor association
 - output is plain JSON, not ROS messages or a network API
+- rerun integration is intentionally deferred for now
 
 That is fine. The repo is set up to make pipeline behavior easy to test before swapping in real cameras or real detectors.

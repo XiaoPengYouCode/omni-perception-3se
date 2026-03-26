@@ -74,10 +74,14 @@ std::string to_json(const PipelineOutput& output) {
     sources += "]";
 
     json += fmt::format(
-        "{{\"track_id\":\"{}\",\"angle\":{:.1f},\"angle_velocity\":{:.1f},\"confidence\":{:.2f},"
+        "{{\"track_id\":\"{}\",\"label\":\"{}\",\"x_m\":{:.2f},\"y_m\":{:.2f},\"world_x_m\":{:.2f},"
+        "\"world_y_m\":{:.2f},\"vx_mps\":{:.2f},\"vy_mps\":{:.2f},\"range_m\":{:.2f},"
+        "\"radius_m\":{:.2f},\"angle\":{:.1f},\"angle_velocity\":{:.1f},\"confidence\":{:.2f},"
         "\"sources\":{},\"last_update_ms\":{}}}",
-        json_escape(report.track_id), report.angle, report.angle_velocity, report.confidence,
-        sources, to_epoch_milliseconds(report.last_update));
+        json_escape(report.track_id), json_escape(report.label), report.x_m, report.y_m,
+        report.world_x_m, report.world_y_m, report.vx_mps, report.vy_mps, report.range_m,
+        report.radius_m, report.angle, report.angle_velocity, report.confidence, sources,
+        to_epoch_milliseconds(report.last_update));
   }
 
   json += "]}";

@@ -23,7 +23,7 @@ build *args:
   done; \
   cmake -S . -B "$dir" \
     -DCMAKE_BUILD_TYPE="$mode" \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
     -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
     -DVCPKG_MANIFEST_MODE=ON; \
   cmake --build "$dir" --target "$target"
@@ -40,7 +40,7 @@ run *args:
   done; \
   cmake -S . -B "$dir" \
     -DCMAKE_BUILD_TYPE="$mode" \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
     -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
     -DVCPKG_MANIFEST_MODE=ON; \
   cmake --build "$dir" --target "$target"; \
@@ -50,7 +50,7 @@ run *args:
 test:
   cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
     -DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
     -DVCPKG_MANIFEST_MODE=ON; \
   cmake --build build; \

@@ -33,8 +33,32 @@ struct FrameInput {
  */
 struct Detection {
   std::string id;
+  std::string label;
   cv::Rect bbox;
-  float confidence;
+  float confidence = 0.0F;
+};
+
+/**
+ * Basic per-camera geometry and rendering assumptions shared by simulation and perception.
+ */
+struct CameraModel {
+  CameraPosition camera;
+  int image_width = 0;
+  int image_height = 0;
+  double horizontal_fov_degrees = 90.0;
+  double assumed_person_height_m = 1.7;
+  double max_range_m = 12.0;
+  double mount_x_m = 0.0;
+  double mount_y_m = 0.0;
+};
+
+/**
+ * Robot pose expressed in world coordinates.
+ */
+struct RobotPose {
+  double x_m = 0.0;
+  double y_m = 0.0;
+  double yaw_degrees = 0.0;
 };
 
 /**
@@ -42,7 +66,13 @@ struct Detection {
  */
 struct PersonReport {
   std::string id;
-  double angle;
+  std::string label;
+  double angle = 0.0;
+  double range_m = 0.0;
+  double x_m = 0.0;
+  double y_m = 0.0;
+  double world_x_m = 0.0;
+  double world_y_m = 0.0;
   CameraPosition camera;
 };
 
@@ -53,6 +83,7 @@ struct FrameMessage {
   CameraPosition camera;
   std::uint64_t frame_id;
   std::chrono::steady_clock::time_point timestamp;
+  RobotPose robot_pose;
   cv::Mat image;
 };
 
@@ -63,6 +94,7 @@ struct DetectionMessage {
   CameraPosition camera;
   std::uint64_t frame_id;
   std::chrono::steady_clock::time_point timestamp;
+  RobotPose robot_pose;
   std::vector<PersonReport> person;
 };
 
@@ -71,9 +103,18 @@ struct DetectionMessage {
  */
 struct TrackedPerson {
   std::string track_id;
-  double angle;
-  double angle_velocity;
-  double confidence;
+  std::string label;
+  double x_m = 0.0;
+  double y_m = 0.0;
+  double world_x_m = 0.0;
+  double world_y_m = 0.0;
+  double vx_mps = 0.0;
+  double vy_mps = 0.0;
+  double range_m = 0.0;
+  double radius_m = 0.0;
+  double angle = 0.0;
+  double angle_velocity = 0.0;
+  double confidence = 0.0;
   std::vector<CameraPosition> sources;
   std::chrono::steady_clock::time_point last_update;
 };

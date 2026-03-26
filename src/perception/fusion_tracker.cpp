@@ -13,33 +13,33 @@ namespace op3 {
 
 namespace {
 
-constexpr auto kStaleTrackTimeout = std::chrono::milliseconds(250);
-constexpr double kInitialConfidence = 0.6;
-constexpr double kConfidenceIncrease = 0.1;
-constexpr double kConfidenceDecayPerSecond = 0.75;
-constexpr double kInitialAngleVariance = 16.0;
-constexpr double kInitialVelocityVariance = 900.0;
-constexpr double kMeasurementVariance = 4.0;
-constexpr double kProcessNoiseIntensity = 400.0;
+constexpr auto kStaleTrackTimeout = std::chrono::milliseconds(1000);
+constexpr double kInitialConfidence = 0.55;
+constexpr double kConfidenceIncrease = 0.12;
+constexpr double kConfidenceDecayPerSecond = 0.3;
+constexpr double kInitialRadiusM = 0.9;
+constexpr double kMinRadiusM = 0.35;
+constexpr double kMaxRadiusM = 3.5;
+constexpr double kRadiusGrowthPerSecond = 0.5;
 constexpr double kAssociationEpsilon = 1e-6;
+constexpr double kPi = 3.14159265358979323846;
 
-/**
- * Checks whether a track already records a given source camera.
- */
 bool contains_camera(const std::vector<CameraPosition>& cameras, CameraPosition camera) {
   return std::find(cameras.begin(), cameras.end(), camera) != cameras.end();
 }
 
-/**
- * Clamps confidence to the normalized [0, 1] range.
- */
+bool labels_match(const std::string& lhs, const std::string& rhs) {
+  return !lhs.empty() && !rhs.empty() && lhs == rhs;
+}
+
 double clamp_confidence(double confidence) {
   return std::clamp(confidence, 0.0, 1.0);
 }
 
-/**
- * Converts steady_clock timestamps into millisecond integers for JSON snapshots.
- */
+double clamp_radius(double radius_m) {
+  return std::clamp(radius_m, kMinRadiusM, kMaxRadiusM);
+}
+
 std::int64_t to_epoch_milliseconds(std::chrono::steady_clock::time_point timestamp) {
   return static_cast<std::int64_t>(
       std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count());
@@ -48,9 +48,9 @@ std::int64_t to_epoch_milliseconds(std::chrono::steady_clock::time_point timesta
 } // namespace
 
 FusionTracker::FusionTracker(BlockingQueue<DetectionMessage>& detection_queue,
-                             double association_gate_degrees, double smoothing_gain)
-    : detection_queue_(detection_queue), association_gate_degrees_(association_gate_degrees),
-      smoothing_gain_(smoothing_gain) {}
+                             double association_gate_m, double position_gain, double velocity_gain)
+    : detection_queue_(detection_queue), association_gate_m_(association_gate_m),
+      position_gain_(position_gain), velocity_gain_(velocity_gain) {}
 
 void FusionTracker::start() {
   thread_ = std::thread([this] { run(); });
@@ -77,10 +77,26 @@ PipelineOutput FusionTracker::snapshot() const {
 
   output.person.reserve(tracks_.size());
   for (const TrackState& track : tracks_) {
+    const cv::Point2d body_point =
+        world_to_body_point(track.world_x_m, track.world_y_m, latest_robot_pose_);
+    const double range_m = body_frame_range_from_point(body_point.x, body_point.y);
+    const double angle = body_frame_angle_from_point(body_point.x, body_point.y);
     output.person.push_back(TrackedPerson{
         .track_id = track.track_id,
-        .angle = track.angle,
-        .angle_velocity = track.angle_velocity,
+        .label = track.label,
+        .x_m = body_point.x,
+        .y_m = body_point.y,
+        .world_x_m = track.world_x_m,
+        .world_y_m = track.world_y_m,
+        .vx_mps = track.vx_mps,
+        .vy_mps = track.vy_mps,
+        .range_m = range_m,
+        .radius_m = track.radius_m,
+        .angle = angle,
+        .angle_velocity = track.vx_mps == 0.0 && track.vy_mps == 0.0
+                              ? 0.0
+                              : (body_point.x * track.vy_mps - body_point.y * track.vx_mps) /
+                                    std::max(range_m * range_m, 1e-6) * (180.0 / kPi),
         .confidence = track.confidence,
         .sources = track.sources,
         .last_update = track.last_update,
@@ -99,9 +115,9 @@ void FusionTracker::run() {
 
 void FusionTracker::ingest(const DetectionMessage& message) {
   std::lock_guard<std::mutex> lock(mutex_);
-  // Track the newest sequence and timestamp so publishers can expose the freshest known state.
   latest_sequence_id_ = std::max(latest_sequence_id_, message.frame_id);
   latest_timestamp_ = std::max(latest_timestamp_, message.timestamp);
+  latest_robot_pose_ = message.robot_pose;
 
   std::vector<std::chrono::steady_clock::duration> prediction_steps;
   prediction_steps.reserve(tracks_.size());
@@ -117,21 +133,36 @@ void FusionTracker::ingest(const DetectionMessage& message) {
     std::size_t best_index = tracks_.size();
     double best_distance = std::numeric_limits<double>::max();
 
-    // Associate by nearest predicted angle inside the gating window. One track can absorb only one
-    // observation from the same message.
-    for (std::size_t index = 0; index < tracks_.size(); ++index) {
-      if (track_assigned[index]) {
-        continue;
-      }
-
-      const double distance = std::abs(normalize_angle(report.angle - tracks_[index].angle));
-      const bool is_better_match = distance + kAssociationEpsilon < best_distance;
-      const bool is_tie_break_winner = std::abs(distance - best_distance) <= kAssociationEpsilon &&
-                                       best_index < tracks_.size() &&
-                                       tracks_[index].last_update > tracks_[best_index].last_update;
-      if (distance < association_gate_degrees_ && (is_better_match || is_tie_break_winner)) {
-        best_distance = distance;
+    if (!report.label.empty()) {
+      for (std::size_t index = 0; index < tracks_.size(); ++index) {
+        if (!labels_match(tracks_[index].label, report.label)) {
+          continue;
+        }
         best_index = index;
+        break;
+      }
+    }
+
+    if (best_index == tracks_.size()) {
+      for (std::size_t index = 0; index < tracks_.size(); ++index) {
+        if (track_assigned[index]) {
+          continue;
+        }
+        if (!report.label.empty() && !tracks_[index].label.empty() &&
+            tracks_[index].label != report.label) {
+          continue;
+        }
+
+        const double distance = association_distance(tracks_[index], report);
+        const bool is_better_match = distance + kAssociationEpsilon < best_distance;
+        const bool is_tie_break_winner =
+            std::abs(distance - best_distance) <= kAssociationEpsilon &&
+            best_index < tracks_.size() &&
+            tracks_[index].last_update > tracks_[best_index].last_update;
+        if (distance < association_gate_m_ && (is_better_match || is_tie_break_winner)) {
+          best_distance = distance;
+          best_index = index;
+        }
       }
     }
 
@@ -155,9 +186,12 @@ void FusionTracker::ingest(const DetectionMessage& message) {
     const double missed_seconds = std::chrono::duration<double>(prediction_steps[index]).count();
     tracks_[index].confidence =
         clamp_confidence(tracks_[index].confidence - (missed_seconds * kConfidenceDecayPerSecond));
+    tracks_[index].radius_m =
+        clamp_radius(tracks_[index].radius_m + (missed_seconds * kRadiusGrowthPerSecond));
   }
 
   prune_stale_tracks(message.timestamp);
+  enforce_unique_labeled_tracks();
 }
 
 void FusionTracker::predict_track(TrackState& track,
@@ -169,55 +203,34 @@ void FusionTracker::predict_track(TrackState& track,
     return;
   }
 
-  const double prior_p00 = track.covariance_00;
-  const double prior_p01 = track.covariance_01;
-  const double prior_p10 = track.covariance_10;
-  const double prior_p11 = track.covariance_11;
-  const double delta_squared = delta_seconds * delta_seconds;
-  const double delta_cubed = delta_squared * delta_seconds;
-  const double delta_fourth = delta_squared * delta_squared;
-
-  const double process_q00 = kProcessNoiseIntensity * delta_fourth * 0.25;
-  const double process_q01 = kProcessNoiseIntensity * delta_cubed * 0.5;
-  const double process_q11 = kProcessNoiseIntensity * delta_squared;
-
-  track.angle = normalize_angle(track.angle + (track.angle_velocity * delta_seconds));
-  track.covariance_00 = prior_p00 + (delta_seconds * (prior_p01 + prior_p10)) +
-                        (delta_squared * prior_p11) + process_q00;
-  track.covariance_01 = prior_p01 + (delta_seconds * prior_p11) + process_q01;
-  track.covariance_10 = prior_p10 + (delta_seconds * prior_p11) + process_q01;
-  track.covariance_11 = prior_p11 + process_q11;
+  track.world_x_m += track.vx_mps * delta_seconds;
+  track.world_y_m += track.vy_mps * delta_seconds;
+  track.radius_m = clamp_radius(track.radius_m + (delta_seconds * kRadiusGrowthPerSecond * 0.4));
   track.state_timestamp = timestamp;
   track.time_since_update = timestamp - track.last_update;
 }
 
 void FusionTracker::update_track(TrackState& track, const PersonReport& report,
                                  std::chrono::steady_clock::time_point timestamp) const {
-  const double innovation = normalize_angle(report.angle - track.angle);
-  const double effective_measurement_variance =
-      kMeasurementVariance / std::clamp(smoothing_gain_, 0.1, 1.0);
-  const double innovation_covariance = track.covariance_00 + effective_measurement_variance;
-  const double kalman_gain_angle = track.covariance_00 / innovation_covariance;
-  const double kalman_gain_velocity = track.covariance_10 / innovation_covariance;
+  const double delta_seconds =
+      std::max(std::chrono::duration<double>(timestamp - track.last_update).count(), 1e-3);
+  const double predicted_x = track.world_x_m;
+  const double predicted_y = track.world_y_m;
+  const double updated_x = predicted_x + (position_gain_ * (report.world_x_m - predicted_x));
+  const double updated_y = predicted_y + (position_gain_ * (report.world_y_m - predicted_y));
+  const double measured_vx = (report.world_x_m - predicted_x) / delta_seconds;
+  const double measured_vy = (report.world_y_m - predicted_y) / delta_seconds;
 
-  const double prior_p00 = track.covariance_00;
-  const double prior_p01 = track.covariance_01;
-  const double prior_p10 = track.covariance_10;
-  const double prior_p11 = track.covariance_11;
-
-  track.angle = normalize_angle(track.angle + (kalman_gain_angle * innovation));
-  track.angle_velocity += kalman_gain_velocity * innovation;
-
-  const double updated_p00 = (1.0 - kalman_gain_angle) * prior_p00;
-  const double updated_p01 = (1.0 - kalman_gain_angle) * prior_p01;
-  const double updated_p10 = prior_p10 - (kalman_gain_velocity * prior_p00);
-  const double updated_p11 = prior_p11 - (kalman_gain_velocity * prior_p01);
-  const double symmetric_cross = (updated_p01 + updated_p10) * 0.5;
-
-  track.covariance_00 = updated_p00;
-  track.covariance_01 = symmetric_cross;
-  track.covariance_10 = symmetric_cross;
-  track.covariance_11 = updated_p11;
+  track.world_x_m = updated_x;
+  track.world_y_m = updated_y;
+  track.vx_mps = ((1.0 - velocity_gain_) * track.vx_mps) + (velocity_gain_ * measured_vx);
+  track.vy_mps = ((1.0 - velocity_gain_) * track.vy_mps) + (velocity_gain_ * measured_vy);
+  track.radius_m = clamp_radius((track.radius_m * 0.55) +
+                                (std::abs(track.range_m - report.range_m) * 0.2) + 0.25);
+  track.range_m = report.range_m;
+  if (track.label.empty() && !report.label.empty()) {
+    track.label = report.label;
+  }
   track.confidence = clamp_confidence(track.confidence + kConfidenceIncrease);
   track.state_timestamp = timestamp;
   track.last_update = timestamp;
@@ -233,12 +246,13 @@ void FusionTracker::create_track(const PersonReport& report,
                                  std::chrono::steady_clock::time_point timestamp) {
   tracks_.push_back(TrackState{
       .track_id = fmt::format("track-{}", next_track_id_++),
-      .angle = normalize_angle(report.angle),
-      .angle_velocity = 0.0,
-      .covariance_00 = kInitialAngleVariance,
-      .covariance_01 = 0.0,
-      .covariance_10 = 0.0,
-      .covariance_11 = kInitialVelocityVariance,
+      .label = report.label,
+      .world_x_m = report.world_x_m,
+      .world_y_m = report.world_y_m,
+      .vx_mps = 0.0,
+      .vy_mps = 0.0,
+      .range_m = report.range_m,
+      .radius_m = kInitialRadiusM,
       .confidence = kInitialConfidence,
       .sources = {report.camera},
       .state_timestamp = timestamp,
@@ -252,9 +266,61 @@ void FusionTracker::create_track(const PersonReport& report,
 void FusionTracker::prune_stale_tracks(std::chrono::steady_clock::time_point timestamp) {
   tracks_.erase(std::remove_if(tracks_.begin(), tracks_.end(),
                                [timestamp](const TrackState& track) {
-                                 return (timestamp - track.last_update) > kStaleTrackTimeout;
+                                 return (timestamp - track.last_update) > kStaleTrackTimeout ||
+                                        track.confidence <= 0.01;
                                }),
                 tracks_.end());
+}
+
+void FusionTracker::enforce_unique_labeled_tracks() {
+  auto is_better_track = [](const TrackState& lhs, const TrackState& rhs) {
+    if (lhs.last_update != rhs.last_update) {
+      return lhs.last_update > rhs.last_update;
+    }
+    if (std::abs(lhs.confidence - rhs.confidence) > kAssociationEpsilon) {
+      return lhs.confidence > rhs.confidence;
+    }
+    if (lhs.hit_count != rhs.hit_count) {
+      return lhs.hit_count > rhs.hit_count;
+    }
+    return lhs.track_id < rhs.track_id;
+  };
+
+  std::vector<TrackState> unique_tracks;
+  unique_tracks.reserve(tracks_.size());
+  for (const TrackState& track : tracks_) {
+    if (track.label.empty()) {
+      unique_tracks.push_back(track);
+      continue;
+    }
+
+    auto existing = std::find_if(unique_tracks.begin(), unique_tracks.end(),
+                                 [&track](const TrackState& candidate) {
+                                   return labels_match(candidate.label, track.label);
+                                 });
+    if (existing == unique_tracks.end()) {
+      unique_tracks.push_back(track);
+      continue;
+    }
+
+    TrackState merged = is_better_track(track, *existing) ? track : *existing;
+    const TrackState& other = is_better_track(track, *existing) ? *existing : track;
+    for (CameraPosition source : other.sources) {
+      if (!contains_camera(merged.sources, source)) {
+        merged.sources.push_back(source);
+      }
+    }
+    merged.confidence = std::max(merged.confidence, other.confidence);
+    merged.radius_m = std::min(merged.radius_m, other.radius_m);
+    *existing = merged;
+  }
+
+  tracks_ = std::move(unique_tracks);
+}
+
+double FusionTracker::association_distance(const TrackState& track,
+                                           const PersonReport& report) const {
+  return std::hypot(report.world_x_m - track.world_x_m, report.world_y_m - track.world_y_m);
 }
 
 } // namespace op3

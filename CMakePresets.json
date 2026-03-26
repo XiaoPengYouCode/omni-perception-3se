@@ -15,7 +15,7 @@
         "PATH": "/opt/homebrew/bin:$penv{PATH}"
       },
       "cacheVariables": {
-        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++",
         "CMAKE_TOOLCHAIN_FILE": "$env{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_MANIFEST_MODE": "ON"
       }
