@@ -1,8 +1,8 @@
 # omni-perception-3se
 
-Minimal C++ perception pipeline demo managed by CMake.
+Minimal C++ perception pipeline managed by CMake.
 
-This repo now builds a small multi-threaded perception demo around an in-process 2D simulator:
+This repo builds a small multi-threaded perception pipeline around an in-process 2D simulator:
 
 - simulates a robot moving in a 2D scene with four fixed camera mounts
 - simulates pedestrians walking along waypoint loops
@@ -16,7 +16,7 @@ The point is simple: keep the pipeline runnable and testable without real camera
 
 ## What It Does
 
-The executable [`omni-perception-3se`](/Users/flamingo/Projects/cmake-demo/src/main.cpp) simulates a four-camera rig:
+The executable [`omni-perception-3se`](src/main.cpp) simulates a four-camera rig:
 
 - `left_front`
 - `right_front`
@@ -33,21 +33,21 @@ Typical output looks like this:
 {"sequence_id":42,"timestamp_ms":1036050526,"person":[{"track_id":"track-1","x_m":4.65,"y_m":2.48,"vx_mps":0.24,"vy_mps":-0.03,"range_m":5.27,"radius_m":0.57,"angle":28.1,"angle_velocity":-0.8,"confidence":0.91,"sources":["left_front","right_front"],"last_update_ms":1036050511}]}
 ```
 
-The simulator starts with three walking pedestrians, so you should expect one to three fused tracks depending on robot pose and camera visibility.
+The simulator starts with four walking pedestrians, so you should expect one to four fused tracks depending on robot pose and camera visibility.
 
 ## Project Layout
 
-- [`src/main.cpp`](/Users/flamingo/Projects/cmake-demo/src/main.cpp): wires the end-to-end demo pipeline together
-- [`src/simulation/simulation_engine.cpp`](/Users/flamingo/Projects/cmake-demo/src/simulation/simulation_engine.cpp): advances the robot/pedestrian world and renders camera images
-- [`src/perception/yolo26_nano_detector.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/yolo26_nano_detector.cpp): mock-backed per-camera detector adapter
-- [`src/perception/mock_person_detector.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/mock_person_detector.cpp): finds dark blobs inside synthetic images
-- [`src/perception/camera_worker.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/camera_worker.cpp): runs per-camera detection and emits observations
-- [`src/perception/fusion_tracker.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/fusion_tracker.cpp): associates 2D observations into tracks
-- [`src/perception/state_publisher.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/state_publisher.cpp): publishes snapshots from the tracker
-- [`src/perception/json_output.cpp`](/Users/flamingo/Projects/cmake-demo/src/perception/json_output.cpp): serializes pipeline state into JSON
-- [`src/core/blocking_queue.hpp`](/Users/flamingo/Projects/cmake-demo/src/core/blocking_queue.hpp): tiny bounded queue used between threads
-- [`tests/app_config_test.cpp`](/Users/flamingo/Projects/cmake-demo/tests/app_config_test.cpp): tests small config helpers
-- [`tests/pipeline_test.cpp`](/Users/flamingo/Projects/cmake-demo/tests/pipeline_test.cpp): tests detection, threading, fusion, publishing, and JSON output
+- [`src/main.cpp`](src/main.cpp): wires the end-to-end pipeline together
+- [`src/simulation/simulation_engine.cpp`](src/simulation/simulation_engine.cpp): advances the robot/pedestrian world and renders camera images
+- [`src/perception/yolo26_nano_detector.cpp`](src/perception/yolo26_nano_detector.cpp): mock-backed per-camera detector adapter
+- [`src/perception/mock_person_detector.cpp`](src/perception/mock_person_detector.cpp): finds dark blobs inside synthetic images
+- [`src/perception/camera_worker.cpp`](src/perception/camera_worker.cpp): runs per-camera detection and emits observations
+- [`src/perception/fusion_tracker.cpp`](src/perception/fusion_tracker.cpp): associates 2D observations into tracks
+- [`src/perception/state_publisher.cpp`](src/perception/state_publisher.cpp): publishes snapshots from the tracker
+- [`src/perception/json_output.cpp`](src/perception/json_output.cpp): serializes pipeline state into JSON
+- [`src/core/blocking_queue.hpp`](src/core/blocking_queue.hpp): tiny bounded queue used between threads
+- [`tests/app_config_test.cpp`](tests/app_config_test.cpp): tests small config helpers
+- [`tests/pipeline_test.cpp`](tests/pipeline_test.cpp): tests detection, threading, fusion, publishing, and JSON output
 
 ## Dependencies
 

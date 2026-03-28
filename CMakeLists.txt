@@ -16,7 +16,6 @@ add_library(omni_perception_3se_core
   src/perception/angle_utils.cpp
   src/perception/camera_worker.cpp
   src/perception/detector_factory.cpp
-  src/perception/demo_frames.cpp
   src/perception/fusion_tracker.cpp
   src/perception/json_output.cpp
   src/perception/mock_person_detector.cpp

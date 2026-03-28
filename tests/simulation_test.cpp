@@ -10,6 +10,10 @@ TEST(SimulationEngineTest, RendersFourCameraFrames) {
   const std::vector<op3::FrameInput> frames = simulation.render_frames();
 
   ASSERT_EQ(frames.size(), 4U);
+  EXPECT_EQ(frames[0].camera, op3::CameraPosition::kLeftFront);
+  EXPECT_EQ(frames[1].camera, op3::CameraPosition::kRightFront);
+  EXPECT_EQ(frames[2].camera, op3::CameraPosition::kLeftRear);
+  EXPECT_EQ(frames[3].camera, op3::CameraPosition::kRightRear);
   for (const op3::FrameInput& frame : frames) {
     EXPECT_FALSE(frame.image.empty());
   }
