@@ -97,16 +97,27 @@ TEST(EstimatePersonRangeTest, LargerBoundingBoxesProduceCloserRanges) {
   EXPECT_GT(far_range, near_range);
 }
 
-TEST(EstimatePersonRangeTest, RoundTripsProjectedHeight) {
+TEST(EstimatePersonRangeTest, RoundTripsProjectedBoundingBox) {
   const op3::CameraModel model = op3::make_default_camera_model(op3::CameraPosition::kLeftFront);
   const double expected_range_m = 4.25;
+  const int bbox_width =
+      static_cast<int>(std::round(op3::project_person_width_pixels(expected_range_m, model)));
   const int bbox_height =
       static_cast<int>(std::round(op3::project_person_height_pixels(expected_range_m, model)));
 
   const double estimated_range =
-      op3::estimate_person_range(cv::Rect(100, 50, 40, bbox_height), model);
+      op3::estimate_person_range(cv::Rect(100, 50, bbox_width, bbox_height), model);
 
   EXPECT_NEAR(estimated_range, expected_range_m, 0.05);
+}
+
+TEST(EstimatePersonRangeTest, UsesWidthToBreakHeightTies) {
+  const op3::CameraModel model = op3::make_default_camera_model(op3::CameraPosition::kLeftFront);
+
+  const double narrower_range = op3::estimate_person_range(cv::Rect(100, 50, 42, 140), model);
+  const double wider_range = op3::estimate_person_range(cv::Rect(100, 50, 74, 140), model);
+
+  EXPECT_GT(narrower_range, wider_range);
 }
 
 TEST(NormalizeAngleTest, WrapsPastPositiveBoundary) {
@@ -212,14 +223,17 @@ TEST(CameraWorkerTest, OffsetsBodyPointByCameraMount) {
   op3::BlockingQueue<op3::DetectionMessage> detection_queue(4);
 
   op3::CameraModel model = op3::make_default_camera_model(op3::CameraPosition::kLeftFront);
+  const int bbox_width = static_cast<int>(std::round(op3::project_person_width_pixels(4.0, model)));
   const int bbox_height =
       static_cast<int>(std::round(op3::project_person_height_pixels(4.0, model)));
+  const int bbox_x = (model.image_width / 2) - (bbox_width / 2);
   op3::CameraWorker worker(
       model,
       std::make_unique<FixedDetector>(
           std::vector<op3::Detection>{
-              op3::Detection{
-                  .id = "cam", .bbox = cv::Rect(460, 40, 40, bbox_height), .confidence = 0.9F},
+              op3::Detection{.id = "cam",
+                             .bbox = cv::Rect(bbox_x, 40, bbox_width, bbox_height),
+                             .confidence = 0.9F},
           },
           nullptr),
       input_queue, detection_queue);
@@ -241,7 +255,7 @@ TEST(CameraWorkerTest, OffsetsBodyPointByCameraMount) {
   ASSERT_EQ(message.person.size(), 1U);
 
   const double camera_range_m =
-      op3::estimate_person_range(cv::Rect(460, 40, 40, bbox_height), model);
+      op3::estimate_person_range(cv::Rect(bbox_x, 40, bbox_width, bbox_height), model);
   const cv::Point2d ray = op3::body_frame_point_from_polar(camera_range_m, 45.0);
   const cv::Point2d expected_body{model.mount_x_m + ray.x, model.mount_y_m + ray.y};
 

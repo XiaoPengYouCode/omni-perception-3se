@@ -35,7 +35,7 @@ double compute_person_angle(CameraPosition camera, const cv::Rect& bbox, int ima
                             double horizontal_fov_degrees = 90.0);
 
 /**
- * Estimates person range from a monocular bounding box height.
+ * Estimates person range from a monocular bounding box size using both width and height.
  */
 double estimate_person_range(const cv::Rect& bbox, const CameraModel& model);
 
@@ -48,6 +48,11 @@ double focal_length_pixels(int image_width, double horizontal_fov_degrees);
  * Projects the assumed person height into image pixels at the given range.
  */
 double project_person_height_pixels(double range_m, const CameraModel& model);
+
+/**
+ * Projects the assumed person width into image pixels at the given range.
+ */
+double project_person_width_pixels(double range_m, const CameraModel& model);
 
 /**
  * Converts body-frame polar coordinates into planar x/y coordinates.

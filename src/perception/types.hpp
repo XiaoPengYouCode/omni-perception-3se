@@ -47,6 +47,7 @@ struct CameraModel {
   int image_height = 0;
   double horizontal_fov_degrees = 90.0;
   double assumed_person_height_m = 1.7;
+  double assumed_person_width_m = 0.765;
   double max_range_m = 12.0;
   double mount_x_m = 0.0;
   double mount_y_m = 0.0;

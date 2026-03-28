@@ -19,6 +19,7 @@ CameraModel make_default_camera_model(CameraPosition camera, int image_width, in
         .image_height = image_height,
         .horizontal_fov_degrees = 90.0,
         .assumed_person_height_m = 1.7,
+        .assumed_person_width_m = 0.765,
         .max_range_m = 12.0,
         .mount_x_m = 0.35,
         .mount_y_m = 0.22,
@@ -30,6 +31,7 @@ CameraModel make_default_camera_model(CameraPosition camera, int image_width, in
         .image_height = image_height,
         .horizontal_fov_degrees = 90.0,
         .assumed_person_height_m = 1.7,
+        .assumed_person_width_m = 0.765,
         .max_range_m = 12.0,
         .mount_x_m = 0.35,
         .mount_y_m = -0.22,
@@ -41,6 +43,7 @@ CameraModel make_default_camera_model(CameraPosition camera, int image_width, in
         .image_height = image_height,
         .horizontal_fov_degrees = 90.0,
         .assumed_person_height_m = 1.7,
+        .assumed_person_width_m = 0.765,
         .max_range_m = 12.0,
         .mount_x_m = -0.35,
         .mount_y_m = 0.22,
@@ -52,6 +55,7 @@ CameraModel make_default_camera_model(CameraPosition camera, int image_width, in
         .image_height = image_height,
         .horizontal_fov_degrees = 90.0,
         .assumed_person_height_m = 1.7,
+        .assumed_person_width_m = 0.765,
         .max_range_m = 12.0,
         .mount_x_m = -0.35,
         .mount_y_m = -0.22,
@@ -100,13 +104,26 @@ double compute_person_angle(CameraPosition camera, const cv::Rect& bbox, int ima
 
 double estimate_person_range(const cv::Rect& bbox, const CameraModel& model) {
   if (bbox.height <= 0 || model.image_height <= 0 || model.image_width <= 0 ||
-      model.assumed_person_height_m <= 0.0 || model.horizontal_fov_degrees <= 0.0) {
+      model.assumed_person_height_m <= 0.0 || model.assumed_person_width_m <= 0.0 ||
+      model.horizontal_fov_degrees <= 0.0) {
     throw std::invalid_argument("invalid camera model or bbox");
   }
 
   const double focal_length = focal_length_pixels(model.image_width, model.horizontal_fov_degrees);
-  const double unclamped_range =
+  const double height_range =
       (model.assumed_person_height_m * focal_length) / static_cast<double>(bbox.height);
+  const double width_range =
+      (model.assumed_person_width_m * focal_length) / static_cast<double>(std::max(bbox.width, 1));
+  const double reference_aspect = model.assumed_person_width_m / model.assumed_person_height_m;
+  const double observed_aspect = static_cast<double>(bbox.width) / static_cast<double>(bbox.height);
+  const double aspect_similarity =
+      std::min(observed_aspect, reference_aspect) / std::max(observed_aspect, reference_aspect);
+  const double width_weight =
+      std::clamp((static_cast<double>(bbox.width) / static_cast<double>(bbox.width + bbox.height)) *
+                     aspect_similarity,
+                 0.0, 0.45);
+  const double unclamped_range =
+      (height_range * (1.0 - width_weight)) + (width_range * width_weight);
   return std::clamp(unclamped_range, 0.1, model.max_range_m);
 }
 
@@ -127,6 +144,16 @@ double project_person_height_pixels(double range_m, const CameraModel& model) {
 
   const double focal_length = focal_length_pixels(model.image_width, model.horizontal_fov_degrees);
   return (model.assumed_person_height_m * focal_length) / range_m;
+}
+
+double project_person_width_pixels(double range_m, const CameraModel& model) {
+  if (range_m <= 0.0 || model.assumed_person_width_m <= 0.0 || model.image_width <= 0 ||
+      model.horizontal_fov_degrees <= 0.0) {
+    throw std::invalid_argument("invalid range or camera model");
+  }
+
+  const double focal_length = focal_length_pixels(model.image_width, model.horizontal_fov_degrees);
+  return (model.assumed_person_width_m * focal_length) / range_m;
 }
 
 cv::Point2d body_frame_point_from_polar(double range_m, double angle_degrees) {
