@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 #include <thread>
@@ -16,7 +17,7 @@ namespace op3 {
 class FusionTracker {
 public:
   /**
-   * Creates a tracker with simple angle-based data association parameters.
+   * Creates a tracker with nearest-neighbor association and EKF-based track updates.
    */
   FusionTracker(BlockingQueue<DetectionMessage>& detection_queue, double association_gate_m = 1.5,
                 double position_gain = 0.45, double velocity_gain = 0.3);
@@ -51,10 +52,8 @@ private:
   struct TrackState {
     std::string track_id;
     std::string label;
-    double world_x_m;
-    double world_y_m;
-    double vx_mps;
-    double vy_mps;
+    std::array<double, 4> state{};
+    std::array<double, 16> covariance{};
     double range_m;
     double radius_m;
     double confidence;

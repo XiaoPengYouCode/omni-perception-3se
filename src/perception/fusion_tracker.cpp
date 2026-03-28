@@ -23,6 +23,31 @@ constexpr double kMaxRadiusM = 3.5;
 constexpr double kRadiusGrowthPerSecond = 0.5;
 constexpr double kAssociationEpsilon = 1e-6;
 constexpr double kPi = 3.14159265358979323846;
+constexpr double kBaseProcessNoiseM = 0.3;
+constexpr double kBaseVelocityNoiseMps = 1.2;
+constexpr double kBaseMeasurementNoiseM = 0.25;
+
+using StateVector = std::array<double, 4>;
+using Matrix4 = std::array<double, 16>;
+using Matrix2 = std::array<double, 4>;
+using Matrix2x4 = std::array<double, 8>;
+using Matrix4x2 = std::array<double, 8>;
+
+double state_x(const StateVector& state) {
+  return state[0];
+}
+
+double state_y(const StateVector& state) {
+  return state[1];
+}
+
+double state_vx(const StateVector& state) {
+  return state[2];
+}
+
+double state_vy(const StateVector& state) {
+  return state[3];
+}
 
 bool contains_camera(const std::vector<CameraPosition>& cameras, CameraPosition camera) {
   return std::find(cameras.begin(), cameras.end(), camera) != cameras.end();
@@ -43,6 +68,231 @@ double clamp_radius(double radius_m) {
 std::int64_t to_epoch_milliseconds(std::chrono::steady_clock::time_point timestamp) {
   return static_cast<std::int64_t>(
       std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch()).count());
+}
+
+Matrix4 identity4() {
+  return Matrix4{
+      1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+  };
+}
+
+Matrix4 transpose4(const Matrix4& matrix) {
+  return Matrix4{
+      matrix[0], matrix[4], matrix[8],  matrix[12], matrix[1], matrix[5], matrix[9],  matrix[13],
+      matrix[2], matrix[6], matrix[10], matrix[14], matrix[3], matrix[7], matrix[11], matrix[15],
+  };
+}
+
+Matrix4 add4(const Matrix4& lhs, const Matrix4& rhs) {
+  Matrix4 result{};
+  for (std::size_t index = 0; index < result.size(); ++index) {
+    result[index] = lhs[index] + rhs[index];
+  }
+  return result;
+}
+
+Matrix2 add2(const Matrix2& lhs, const Matrix2& rhs) {
+  Matrix2 result{};
+  for (std::size_t index = 0; index < result.size(); ++index) {
+    result[index] = lhs[index] + rhs[index];
+  }
+  return result;
+}
+
+Matrix4 subtract4(const Matrix4& lhs, const Matrix4& rhs) {
+  Matrix4 result{};
+  for (std::size_t index = 0; index < result.size(); ++index) {
+    result[index] = lhs[index] - rhs[index];
+  }
+  return result;
+}
+
+StateVector multiply4x4_vector(const Matrix4& matrix, const StateVector& vector) {
+  return StateVector{
+      (matrix[0] * vector[0]) + (matrix[1] * vector[1]) + (matrix[2] * vector[2]) +
+          (matrix[3] * vector[3]),
+      (matrix[4] * vector[0]) + (matrix[5] * vector[1]) + (matrix[6] * vector[2]) +
+          (matrix[7] * vector[3]),
+      (matrix[8] * vector[0]) + (matrix[9] * vector[1]) + (matrix[10] * vector[2]) +
+          (matrix[11] * vector[3]),
+      (matrix[12] * vector[0]) + (matrix[13] * vector[1]) + (matrix[14] * vector[2]) +
+          (matrix[15] * vector[3]),
+  };
+}
+
+Matrix4 multiply4x4(const Matrix4& lhs, const Matrix4& rhs) {
+  Matrix4 result{};
+  for (int row = 0; row < 4; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 4; ++inner) {
+        value += lhs[(row * 4) + inner] * rhs[(inner * 4) + col];
+      }
+      result[(row * 4) + col] = value;
+    }
+  }
+  return result;
+}
+
+Matrix4x2 multiply4x4_4x2(const Matrix4& lhs, const Matrix4x2& rhs) {
+  Matrix4x2 result{};
+  for (int row = 0; row < 4; ++row) {
+    for (int col = 0; col < 2; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 4; ++inner) {
+        value += lhs[(row * 4) + inner] * rhs[(inner * 2) + col];
+      }
+      result[(row * 2) + col] = value;
+    }
+  }
+  return result;
+}
+
+Matrix2x4 multiply2x4_4x4(const Matrix2x4& lhs, const Matrix4& rhs) {
+  Matrix2x4 result{};
+  for (int row = 0; row < 2; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 4; ++inner) {
+        value += lhs[(row * 4) + inner] * rhs[(inner * 4) + col];
+      }
+      result[(row * 4) + col] = value;
+    }
+  }
+  return result;
+}
+
+Matrix2 multiply2x4_4x2(const Matrix2x4& lhs, const Matrix4x2& rhs) {
+  Matrix2 result{};
+  for (int row = 0; row < 2; ++row) {
+    for (int col = 0; col < 2; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 4; ++inner) {
+        value += lhs[(row * 4) + inner] * rhs[(inner * 2) + col];
+      }
+      result[(row * 2) + col] = value;
+    }
+  }
+  return result;
+}
+
+Matrix4 multiply4x2_2x4(const Matrix4x2& lhs, const Matrix2x4& rhs) {
+  Matrix4 result{};
+  for (int row = 0; row < 4; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 2; ++inner) {
+        value += lhs[(row * 2) + inner] * rhs[(inner * 4) + col];
+      }
+      result[(row * 4) + col] = value;
+    }
+  }
+  return result;
+}
+
+StateVector multiply4x2_vector(const Matrix4x2& matrix, const std::array<double, 2>& vector) {
+  return StateVector{
+      (matrix[0] * vector[0]) + (matrix[1] * vector[1]),
+      (matrix[2] * vector[0]) + (matrix[3] * vector[1]),
+      (matrix[4] * vector[0]) + (matrix[5] * vector[1]),
+      (matrix[6] * vector[0]) + (matrix[7] * vector[1]),
+  };
+}
+
+Matrix4x2 transpose2x4(const Matrix2x4& matrix) {
+  return Matrix4x2{
+      matrix[0], matrix[4], matrix[1], matrix[5], matrix[2], matrix[6], matrix[3], matrix[7],
+  };
+}
+
+Matrix2x4 transpose4x2(const Matrix4x2& matrix) {
+  return Matrix2x4{
+      matrix[0], matrix[2], matrix[4], matrix[6], matrix[1], matrix[3], matrix[5], matrix[7],
+  };
+}
+
+Matrix2 invert2x2(const Matrix2& matrix) {
+  const double determinant = (matrix[0] * matrix[3]) - (matrix[1] * matrix[2]);
+  if (std::abs(determinant) <= 1e-9) {
+    return Matrix2{
+        1e6,
+        0.0,
+        0.0,
+        1e6,
+    };
+  }
+
+  const double inverse_determinant = 1.0 / determinant;
+  return Matrix2{
+      matrix[3] * inverse_determinant,
+      -matrix[1] * inverse_determinant,
+      -matrix[2] * inverse_determinant,
+      matrix[0] * inverse_determinant,
+  };
+}
+
+Matrix4x2 multiply4x2_2x2(const Matrix4x2& lhs, const Matrix2& rhs) {
+  Matrix4x2 result{};
+  for (int row = 0; row < 4; ++row) {
+    for (int col = 0; col < 2; ++col) {
+      double value = 0.0;
+      for (int inner = 0; inner < 2; ++inner) {
+        value += lhs[(row * 2) + inner] * rhs[(inner * 2) + col];
+      }
+      result[(row * 2) + col] = value;
+    }
+  }
+  return result;
+}
+
+Matrix4 make_transition_matrix(double delta_seconds) {
+  return Matrix4{
+      1.0, 0.0, delta_seconds, 0.0, 0.0, 1.0, 0.0, delta_seconds,
+      0.0, 0.0, 1.0,           0.0, 0.0, 0.0, 0.0, 1.0,
+  };
+}
+
+Matrix4 make_process_noise(double delta_seconds, double position_gain, double velocity_gain) {
+  const double dt2 = delta_seconds * delta_seconds;
+  const double dt3 = dt2 * delta_seconds;
+  const double dt4 = dt2 * dt2;
+  const double position_variance =
+      std::max(0.05, kBaseProcessNoiseM * (1.0 + (1.0 - position_gain)));
+  const double velocity_variance =
+      std::max(0.1, kBaseVelocityNoiseMps * (1.0 + (1.0 - velocity_gain)));
+  const double acceleration_variance =
+      std::max(position_variance * position_variance, velocity_variance * velocity_variance);
+
+  return Matrix4{
+      0.25 * dt4 * acceleration_variance,
+      0.0,
+      0.5 * dt3 * acceleration_variance,
+      0.0,
+      0.0,
+      0.25 * dt4 * acceleration_variance,
+      0.0,
+      0.5 * dt3 * acceleration_variance,
+      0.5 * dt3 * acceleration_variance,
+      0.0,
+      dt2 * acceleration_variance,
+      0.0,
+      0.0,
+      0.5 * dt3 * acceleration_variance,
+      0.0,
+      dt2 * acceleration_variance,
+  };
+}
+
+Matrix2 make_measurement_noise(double range_m, double position_gain) {
+  const double sigma =
+      std::max(0.2, kBaseMeasurementNoiseM * (1.0 + (1.0 - position_gain)) + (range_m * 0.03));
+  const double variance = sigma * sigma;
+  return Matrix2{
+      variance,
+      0.0,
+      0.0,
+      variance,
+  };
 }
 
 } // namespace
@@ -78,7 +328,7 @@ PipelineOutput FusionTracker::snapshot() const {
   output.person.reserve(tracks_.size());
   for (const TrackState& track : tracks_) {
     const cv::Point2d body_point =
-        world_to_body_point(track.world_x_m, track.world_y_m, latest_robot_pose_);
+        world_to_body_point(state_x(track.state), state_y(track.state), latest_robot_pose_);
     const double range_m = body_frame_range_from_point(body_point.x, body_point.y);
     const double angle = body_frame_angle_from_point(body_point.x, body_point.y);
     output.person.push_back(TrackedPerson{
@@ -86,17 +336,18 @@ PipelineOutput FusionTracker::snapshot() const {
         .label = track.label,
         .x_m = body_point.x,
         .y_m = body_point.y,
-        .world_x_m = track.world_x_m,
-        .world_y_m = track.world_y_m,
-        .vx_mps = track.vx_mps,
-        .vy_mps = track.vy_mps,
+        .world_x_m = state_x(track.state),
+        .world_y_m = state_y(track.state),
+        .vx_mps = state_vx(track.state),
+        .vy_mps = state_vy(track.state),
         .range_m = range_m,
         .radius_m = track.radius_m,
         .angle = angle,
-        .angle_velocity = track.vx_mps == 0.0 && track.vy_mps == 0.0
-                              ? 0.0
-                              : (body_point.x * track.vy_mps - body_point.y * track.vx_mps) /
-                                    std::max(range_m * range_m, 1e-6) * (180.0 / kPi),
+        .angle_velocity =
+            state_vx(track.state) == 0.0 && state_vy(track.state) == 0.0
+                ? 0.0
+                : (body_point.x * state_vy(track.state) - body_point.y * state_vx(track.state)) /
+                      std::max(range_m * range_m, 1e-6) * (180.0 / kPi),
         .confidence = track.confidence,
         .sources = track.sources,
         .last_update = track.last_update,
@@ -203,8 +454,11 @@ void FusionTracker::predict_track(TrackState& track,
     return;
   }
 
-  track.world_x_m += track.vx_mps * delta_seconds;
-  track.world_y_m += track.vy_mps * delta_seconds;
+  const Matrix4 transition = make_transition_matrix(delta_seconds);
+  track.state = multiply4x4_vector(transition, track.state);
+  track.covariance =
+      add4(multiply4x4(multiply4x4(transition, track.covariance), transpose4(transition)),
+           make_process_noise(delta_seconds, position_gain_, velocity_gain_));
   track.radius_m = clamp_radius(track.radius_m + (delta_seconds * kRadiusGrowthPerSecond * 0.4));
   track.state_timestamp = timestamp;
   track.time_since_update = timestamp - track.last_update;
@@ -212,19 +466,42 @@ void FusionTracker::predict_track(TrackState& track,
 
 void FusionTracker::update_track(TrackState& track, const PersonReport& report,
                                  std::chrono::steady_clock::time_point timestamp) const {
-  const double delta_seconds =
-      std::max(std::chrono::duration<double>(timestamp - track.last_update).count(), 1e-3);
-  const double predicted_x = track.world_x_m;
-  const double predicted_y = track.world_y_m;
-  const double updated_x = predicted_x + (position_gain_ * (report.world_x_m - predicted_x));
-  const double updated_y = predicted_y + (position_gain_ * (report.world_y_m - predicted_y));
-  const double measured_vx = (report.world_x_m - predicted_x) / delta_seconds;
-  const double measured_vy = (report.world_y_m - predicted_y) / delta_seconds;
+  const Matrix2x4 measurement_jacobian = {
+      1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+  };
+  const Matrix4x2 measurement_jacobian_transpose = transpose2x4(measurement_jacobian);
+  const std::array<double, 2> measurement = {report.world_x_m, report.world_y_m};
+  const std::array<double, 2> predicted_measurement = {track.state[0], track.state[1]};
+  const std::array<double, 2> residual = {
+      measurement[0] - predicted_measurement[0],
+      measurement[1] - predicted_measurement[1],
+  };
+  const Matrix2 measurement_noise = make_measurement_noise(report.range_m, position_gain_);
 
-  track.world_x_m = updated_x;
-  track.world_y_m = updated_y;
-  track.vx_mps = ((1.0 - velocity_gain_) * track.vx_mps) + (velocity_gain_ * measured_vx);
-  track.vy_mps = ((1.0 - velocity_gain_) * track.vy_mps) + (velocity_gain_ * measured_vy);
+  const Matrix2 innovation_covariance =
+      add2(multiply2x4_4x2(multiply2x4_4x4(measurement_jacobian, track.covariance),
+                           measurement_jacobian_transpose),
+           measurement_noise);
+  const Matrix4x2 kalman_gain = multiply4x4_4x2(track.covariance, measurement_jacobian_transpose);
+  const Matrix2 innovation_inverse = invert2x2(innovation_covariance);
+
+  const Matrix4x2 normalized_kalman_gain = multiply4x2_2x2(kalman_gain, innovation_inverse);
+
+  const StateVector correction = multiply4x2_vector(normalized_kalman_gain, residual);
+  for (int index = 0; index < 4; ++index) {
+    track.state[index] += correction[index];
+  }
+
+  const Matrix4 covariance_update = multiply4x2_2x4(normalized_kalman_gain, measurement_jacobian);
+  const Matrix4 residual_projection = subtract4(identity4(), covariance_update);
+  const Matrix4 residual_projection_transpose = transpose4(residual_projection);
+  const Matrix4x2 gain_times_measurement_noise =
+      multiply4x2_2x2(normalized_kalman_gain, measurement_noise);
+  track.covariance =
+      add4(multiply4x4(multiply4x4(residual_projection, track.covariance),
+                       residual_projection_transpose),
+           multiply4x2_2x4(gain_times_measurement_noise, transpose4x2(normalized_kalman_gain)));
+
   track.radius_m = clamp_radius((track.radius_m * 0.55) +
                                 (std::abs(track.range_m - report.range_m) * 0.2) + 0.25);
   track.range_m = report.range_m;
@@ -244,13 +521,29 @@ void FusionTracker::update_track(TrackState& track, const PersonReport& report,
 
 void FusionTracker::create_track(const PersonReport& report,
                                  std::chrono::steady_clock::time_point timestamp) {
-  tracks_.push_back(TrackState{
+  TrackState track{
       .track_id = fmt::format("track-{}", next_track_id_++),
       .label = report.label,
-      .world_x_m = report.world_x_m,
-      .world_y_m = report.world_y_m,
-      .vx_mps = 0.0,
-      .vy_mps = 0.0,
+      .state = {report.world_x_m, report.world_y_m, 0.0, 0.0},
+      .covariance =
+          {
+              0.8,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.8,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              25.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              25.0,
+          },
       .range_m = report.range_m,
       .radius_m = kInitialRadiusM,
       .confidence = kInitialConfidence,
@@ -260,7 +553,8 @@ void FusionTracker::create_track(const PersonReport& report,
       .time_since_update = std::chrono::steady_clock::duration::zero(),
       .hit_count = 1,
       .missed_update_count = 0,
-  });
+  };
+  tracks_.push_back(track);
 }
 
 void FusionTracker::prune_stale_tracks(std::chrono::steady_clock::time_point timestamp) {
@@ -320,7 +614,8 @@ void FusionTracker::enforce_unique_labeled_tracks() {
 
 double FusionTracker::association_distance(const TrackState& track,
                                            const PersonReport& report) const {
-  return std::hypot(report.world_x_m - track.world_x_m, report.world_y_m - track.world_y_m);
+  return std::hypot(report.world_x_m - state_x(track.state),
+                    report.world_y_m - state_y(track.state));
 }
 
 } // namespace op3

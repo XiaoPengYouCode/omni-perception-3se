@@ -400,6 +400,45 @@ TEST(FusionTrackerTest, StabilizesAngularVelocityAcrossConsistentMeasurements) {
   EXPECT_GT(output.person.front().confidence, 0.75);
 }
 
+TEST(FusionTrackerTest, PredictsForwardAcrossMissedObservation) {
+  op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
+  op3::FusionTracker tracker(detection_queue, 1.5, 0.45, 0.3);
+  tracker.start();
+
+  const auto base_time = std::chrono::steady_clock::now();
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 1,
+      .timestamp = base_time,
+      .robot_pose = {},
+      .person = {make_report("1", 0.0, 4.0, op3::CameraPosition::kLeftFront)},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 2,
+      .timestamp = base_time + std::chrono::milliseconds(100),
+      .robot_pose = {},
+      .person = {make_report("1", 0.0, 4.8, op3::CameraPosition::kLeftFront)},
+  });
+  detection_queue.push(op3::DetectionMessage{
+      .camera = op3::CameraPosition::kLeftFront,
+      .frame_id = 3,
+      .timestamp = base_time + std::chrono::milliseconds(250),
+      .robot_pose = {},
+      .person = {},
+  });
+
+  allow_tracker_to_drain();
+  tracker.stop();
+  tracker.join();
+
+  const op3::PipelineOutput output = tracker.snapshot();
+  ASSERT_EQ(output.person.size(), 1U);
+  EXPECT_GT(output.person.front().vx_mps, 0.1);
+  EXPECT_GT(output.person.front().world_x_m, 4.8);
+  EXPECT_LT(output.person.front().confidence, 0.8);
+}
+
 TEST(FusionTrackerTest, PrefersStableLabelIdentityOverDistanceGate) {
   op3::BlockingQueue<op3::DetectionMessage> detection_queue(8);
   op3::FusionTracker tracker(detection_queue, 0.5, 0.45, 0.3);
